@@ -1,19 +1,19 @@
 TARGET = kernel.elf
-OBJS = main.o graphics.o font.o hankaku.o newlib_support.o
+OBJS = main.o graphics.o font.o hankaku.o newlib_support.o console.o
 DEPENDS = $(join $(dir $(OBJS)),$(addprefix .,$(notdir $(OBJS:.o=.d))))
 
 CFLAGS   +=	-O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone
-CXXFLAGS += -I../../osbook/devenv/x86_64-elf/include/c++/v1 \
+CPPFLAGS += -I../../osbook/devenv/x86_64-elf/include/c++/v1 \
 			-I../../osbook/devenv/x86_64-elf/include \
 			-I../../osbook/devenv/x86_64-elf/include/freetype2 \
 			-I../../edk2/MdePkg/Include \
 			-I../../edk2/MdePkg/Include/X64 \
 			-nostdlibinc -D__ELF__ -D_LDBL_EQ_DBL -D_GNU_SOURCE \
-			-D_POSIX_TIMERS -DEFIAPI='__attribute__((ms_abi))' \
-			-O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
+			-D_POSIX_TIMERS -DEFIAPI='__attribute__((ms_abi))'
+CXXFLAGS +=	-O2 -Wall -g --target=x86_64-elf -ffreestanding -mno-red-zone \
 			-fno-exceptions -fno-rtti -std=c++17
-LDFLAGS += -L../../osbook/devenv/x86_64-elf/lib \
-		   --entry KernelMain -z norelro --image-base 0x100000 --static
+LDFLAGS  += -L../../osbook/devenv/x86_64-elf/lib \
+		    --entry KernelMain -z norelro --image-base 0x100000 --static
 
 .PHONY: all
 all: $(TARGET)
