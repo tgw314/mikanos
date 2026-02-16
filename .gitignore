@@ -1,3 +1,4 @@
-*.elf
+kernel.elf
 *.o
+.*.d
 **/.cache/

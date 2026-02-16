@@ -1,5 +1,6 @@
 TARGET = kernel.elf
-OBJS = main.o
+OBJS = main.o graphics.o font.o
+DEPENDS = $(join $(dir $(OBJS)),$(addprefix .,$(notdir $(OBJS:.o=.d))))
 
 CXXFLAGS += -I/home/tagawa/mikan/osbook/devenv/x86_64-elf/include/c++/v1 \
 			-I/home/tagawa/mikan/osbook/devenv/x86_64-elf/include \
@@ -25,3 +26,14 @@ kernel.elf: $(OBJS) Makefile
 
 %.o: %.cpp Makefile
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $<
+
+.%.d: %.cpp
+	clang++ $(CPPFLAGS) $(CXXFLAGS) -MM $< > $@
+	$(eval OBJ = $(<:.cpp=.o))
+	sed --in-place 's|$(notdir $(OBJ))|$(OBJ)|' $@
+
+.PHONY: depends
+depends:
+	$(MAKE) $(DEPENDS)
+
+-include $(DEPENDS)
