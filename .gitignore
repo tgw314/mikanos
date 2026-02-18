@@ -1,5 +1,6 @@
 kernel.elf
 hankaku.bin
+**/compile_commands.json
 *.o
 .*.d
 **/.cache/
