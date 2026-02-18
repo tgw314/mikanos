@@ -5,8 +5,7 @@
 #include "console.hpp"
 #include "frame_buffer_config.hpp"
 #include "graphics.hpp"
-
-void *operator new(size_t size, void *buf) { return buf; }
+#include "pci.hpp"
 
 // sized-deallocation が LLVM 19 から有効になったので size 引数を追加した
 void operator delete(void *obj, size_t size) noexcept {}
@@ -104,6 +103,18 @@ extern "C" void KernelMain(const FrameBufferConfig &frame_buffer_config) {
                     break;
             }
         }
+    }
+
+    auto err = pci::ScanAllBus();
+    printk("ScanAllBus: %s\n", err.Name());
+
+    for (int i = 0; i < pci::num_device; i++) {
+        const auto &dev = pci::devices[i];
+        auto vendor_id = pci::ReadVendorId(dev.bus, dev.device, dev.function);
+        auto class_code = pci::ReadClassCode(dev.bus, dev.device, dev.function);
+        printk("%d.%d.%d: vend %04x, class %08x, head %02x\n", dev.bus,
+               dev.device, dev.function, vendor_id, class_code,
+               dev.header_type);
     }
 
     for (;;) __asm__("hlt");
