@@ -6,17 +6,16 @@
 #include "usb/device.hpp"
 
 namespace usb {
-HIDBaseDriver::HIDBaseDriver(Device *dev, int interface_index,
-                             int in_packet_size)
+HIDBaseDriver::HIDBaseDriver(Device *dev, int interface_index)
     : ClassDriver{dev},
-      interface_index_{interface_index},
-      in_packet_size_{in_packet_size} {}
+      interface_index_{interface_index} {}
 
 Error HIDBaseDriver::Initialize() { return MAKE_ERROR(Error::kNotImplemented); }
 
 Error HIDBaseDriver::SetEndpoint(const EndpointConfig &config) {
     if (config.ep_type == EndpointType::kInterrupt && config.ep_id.IsIn()) {
         ep_interrupt_in_ = config.ep_id;
+        max_packet_size_ = config.max_packet_size;
     } else if (config.ep_type == EndpointType::kInterrupt &&
                !config.ep_id.IsIn()) {
         ep_interrupt_out_ = config.ep_id;
@@ -47,7 +46,7 @@ Error HIDBaseDriver::OnControlCompleted(EndpointID ep_id, SetupData setup_data,
     if (initialize_phase_ == 1) {
         initialize_phase_ = 2;
         return ParentDevice()->InterruptIn(ep_interrupt_in_, buf_.data(),
-                                           in_packet_size_);
+                                           max_packet_size_);
     }
 
     return MAKE_ERROR(Error::kNotImplemented);
@@ -59,7 +58,7 @@ Error HIDBaseDriver::OnInterruptCompleted(EndpointID ep_id, const void *buf,
         OnDataReceived();
         std::copy_n(buf_.begin(), len, previous_buf_.begin());
         return ParentDevice()->InterruptIn(ep_interrupt_in_, buf_.data(),
-                                           in_packet_size_);
+                                           max_packet_size_);
     }
 
     return MAKE_ERROR(Error::kNotImplemented);

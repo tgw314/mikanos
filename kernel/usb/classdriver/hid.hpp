@@ -11,7 +11,7 @@
 namespace usb {
 class HIDBaseDriver : public ClassDriver {
    public:
-    HIDBaseDriver(Device *dev, int interface_index, int in_packet_size);
+    HIDBaseDriver(Device *dev, int interface_index);
     Error Initialize() override;
     Error SetEndpoint(const EndpointConfig &config) override;
     Error OnEndpointsConfigured() override;
@@ -31,7 +31,7 @@ class HIDBaseDriver : public ClassDriver {
     EndpointID ep_interrupt_in_;
     EndpointID ep_interrupt_out_;
     const int interface_index_;
-    int in_packet_size_;
+    int max_packet_size_{0};
     int initialize_phase_{0};
 
     std::array<uint8_t, kBufferSize> buf_{}, previous_buf_{};

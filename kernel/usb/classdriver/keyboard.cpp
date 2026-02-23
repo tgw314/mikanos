@@ -7,7 +7,7 @@
 
 namespace usb {
 HIDKeyboardDriver::HIDKeyboardDriver(Device *dev, int interface_index)
-    : HIDBaseDriver{dev, interface_index, 8} {}
+    : HIDBaseDriver{dev, interface_index} {}
 
 Error HIDKeyboardDriver::OnDataReceived() {
     for (int i = 2; i < 8; ++i) {

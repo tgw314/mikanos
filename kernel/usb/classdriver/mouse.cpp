@@ -8,7 +8,7 @@
 
 namespace usb {
 HIDMouseDriver::HIDMouseDriver(Device *dev, int interface_index)
-    : HIDBaseDriver{dev, interface_index, 3} {}
+    : HIDBaseDriver{dev, interface_index} {}
 
 Error HIDMouseDriver::OnDataReceived() {
     int8_t displacement_x = Buffer()[1];
