@@ -14,6 +14,9 @@ class ConfigurationDescriptorReader {
         : desc_buf_{desc_buf}, desc_buf_len_{len}, p_{desc_buf} {}
 
     const uint8_t *Next() {
+        if (p_[0] == 0) {
+            return nullptr;
+        }
         p_ += p_[0];
         if (p_ < desc_buf_ + desc_buf_len_) {
             return p_;
@@ -130,7 +133,7 @@ Error Device::StartInitialize() {
     is_initialized_ = false;
     initialize_phase_ = 1;
     return GetDescriptor(*this, kDefaultControlPipeID, DeviceDescriptor::kType,
-                         0, buf_.data(), buf_.size(), true);
+                         0, buf_.data(), 8, true);
 }
 
 Error Device::OnEndpointsConfigured() {
@@ -146,8 +149,8 @@ Error Device::OnEndpointsConfigured() {
 
 Error Device::OnControlCompleted(EndpointID ep_id, SetupData setup_data,
                                  const void *buf, int len) {
-    Log(kDebug, "Device::OnControlCompleted: buf 0x%08x, len %d, dir %d\n", buf,
-        len, setup_data.request_type.bits.direction);
+    Log(kDebug, "OnControlCompleted: phase=%d, req=%d, len=%d\n",
+        initialize_phase_, setup_data.request, len);
     if (is_initialized_) {
         if (auto w = event_waiters_.Get(setup_data)) {
             return w.value()->OnControlCompleted(ep_id, setup_data, buf, len);
@@ -162,11 +165,22 @@ Error Device::OnControlCompleted(EndpointID ep_id, SetupData setup_data,
             return InitializePhase1(buf8, len);
         }
         return MAKE_ERROR(Error::kInvalidPhase);
+    } else if (initialize_phase_ == 11) {
+        // phase 1b: フルサイズのデバイスディスクリプタ取得完了
+        if (setup_data.request == request::kGetDescriptor &&
+            DescriptorDynamicCast<DeviceDescriptor>(buf8)) {
+            return InitializePhase1b(buf8, len);
+        }
+        Log(kDebug, "Phase11 mismatch: req=%d, buf[1]=%d\n",
+            setup_data.request, buf8[1]);
+        return MAKE_ERROR(Error::kInvalidPhase);
     } else if (initialize_phase_ == 2) {
         if (setup_data.request == request::kGetDescriptor &&
             DescriptorDynamicCast<ConfigurationDescriptor>(buf8)) {
             return InitializePhase2(buf8, len);
         }
+        Log(kDebug, "Phase2 mismatch: req=%d, buf[1]=%d\n",
+            setup_data.request, buf8[1]);
         return MAKE_ERROR(Error::kInvalidPhase);
     } else if (initialize_phase_ == 3) {
         if (setup_data.request == request::kSetConfiguration) {
@@ -188,10 +202,31 @@ Error Device::OnInterruptCompleted(EndpointID ep_id, const void *buf, int len) {
 
 Error Device::InitializePhase1(const uint8_t *buf, int len) {
     const auto device_desc = DescriptorDynamicCast<DeviceDescriptor>(buf);
+    ep0_max_packet_size_ = device_desc->max_packet_size;
+    Log(kDebug, "InitPhase1: bMaxPacketSize0=%d\n", ep0_max_packet_size_);
+    // フェーズ 11 (1b) へ: Evaluate Context 完了後、またはすぐにフルサイズ取得
+    // Evaluate Context は xhci.cpp 側で発行するため、ここでは phase=11 に
+    // 遷移してフルサイズ取得を待つのではなく、まず ep0_max_packet_size_ を
+    // 返してから xhci.cpp 側で EvaluateContext + InitializePhase1b を呼ぶ。
+    // ここでは phase=1 のままにして、呼び出し元（xhci.cpp）で判断させる。
+    initialize_phase_ = 1;  // xhci.cpp が OnEvaluateContextCompleted を呼ぶ
+    return MAKE_ERROR(Error::kSuccess);
+}
+
+Error Device::OnEvaluateContextCompleted() {
+    Log(kDebug, "OnEvaluateContextCompleted: phase=%d, fetching full DeviceDescriptor\n", initialize_phase_);
+    initialize_phase_ = 11;
+    return GetDescriptor(*this, kDefaultControlPipeID, DeviceDescriptor::kType,
+                         0, buf_.data(), buf_.size(), true);
+}
+
+Error Device::InitializePhase1b(const uint8_t *buf, int len) {
+    const auto device_desc = DescriptorDynamicCast<DeviceDescriptor>(buf);
     num_configurations_ = device_desc->num_configurations;
     config_index_ = 0;
     initialize_phase_ = 2;
-    Log(kDebug, "issuing GetDesc(Config): index=%d)\n", config_index_);
+    Log(kDebug, "InitPhase1b: num_config=%d, issuing GetDesc(Config)\n",
+        num_configurations_);
     return GetDescriptor(*this, kDefaultControlPipeID,
                          ConfigurationDescriptor::kType, config_index_,
                          buf_.data(), buf_.size(), true);
@@ -200,52 +235,63 @@ Error Device::InitializePhase1(const uint8_t *buf, int len) {
 Error Device::InitializePhase2(const uint8_t *buf, int len) {
     auto conf_desc = DescriptorDynamicCast<ConfigurationDescriptor>(buf);
     if (conf_desc == nullptr) {
+        Log(kDebug, "InitPhase2: FAILED - conf_desc is null\n");
         return MAKE_ERROR(Error::kInvalidDescriptor);
     }
+    Log(kDebug, "InitPhase2: total_len=%d, num_if=%d\n",
+        conf_desc->total_length, conf_desc->num_interfaces);
     ConfigurationDescriptorReader config_reader{buf, len};
 
-    ClassDriver *class_driver = nullptr;
+    bool found_any_driver = false;
     while (auto if_desc = config_reader.Next<InterfaceDescriptor>()) {
-        Log(kDebug, *if_desc);
+        Log(kDebug, "Interface: class=%d, sub=%d, proto=%d\n",
+            if_desc->interface_class, if_desc->interface_sub_class,
+            if_desc->interface_protocol);
 
-        class_driver = NewClassDriver(this, *if_desc);
+        ClassDriver *class_driver = NewClassDriver(this, *if_desc);
         if (class_driver == nullptr) {
-            // 非対応デバイス．次の interface を調べる．
             continue;
         }
+        found_any_driver = true;
 
-        num_ep_configs_ = 0;
-
-        while (num_ep_configs_ < if_desc->num_endpoints) {
+        for (int ep_count = 0; ep_count < if_desc->num_endpoints; ) {
             auto desc = config_reader.Next();
+            if (desc == nullptr) {
+                Log(kDebug, "InitPhase2: descriptor ended unexpectedly\n");
+                break;
+            }
             if (auto ep_desc =
                     DescriptorDynamicCast<EndpointDescriptor>(desc)) {
                 auto conf = MakeEPConfig(*ep_desc);
-                Log(kDebug, conf);
+                Log(kDebug, "EP: id=%d, type=%d, mps=%d, interval=%d\n",
+                    conf.ep_id.Address(), static_cast<int>(conf.ep_type),
+                    conf.max_packet_size, conf.interval);
 
                 ep_configs_[num_ep_configs_] = conf;
                 ++num_ep_configs_;
                 class_drivers_[conf.ep_id.Number()] = class_driver;
+                ++ep_count;
             } else if (auto hid_desc =
                            DescriptorDynamicCast<HIDDescriptor>(desc)) {
-                Log(kDebug, *hid_desc);
+                Log(kDebug, "HID: release=0x%02x\n", hid_desc->hid_release);
             }
         }
-
-        break;
     }
 
-    if (!class_driver) {
+    if (!found_any_driver) {
+        Log(kDebug, "InitPhase2: no supported class driver found\n");
         return MAKE_ERROR(Error::kSuccess);
     }
     initialize_phase_ = 3;
-    Log(kDebug, "issuing SetConfiguration: conf_val=%d\n",
+    Log(kDebug, "InitPhase2: issuing SetConfiguration: conf_val=%d\n",
         conf_desc->configuration_value);
     return SetConfiguration(*this, kDefaultControlPipeID,
                             conf_desc->configuration_value, true);
 }
 
 Error Device::InitializePhase3(uint8_t config_value) {
+    Log(kDebug, "InitPhase3: SetConfiguration done, num_ep=%d, config=%d\n",
+        num_ep_configs_, config_value);
     for (int i = 0; i < num_ep_configs_; ++i) {
         class_drivers_[ep_configs_[i].ep_id.Number()]->SetEndpoint(
             ep_configs_[i]);

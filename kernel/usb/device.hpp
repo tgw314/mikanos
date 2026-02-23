@@ -27,7 +27,10 @@ class Device {
     virtual Error InterruptOut(EndpointID ep_id, void *buf, int len);
 
     Error StartInitialize();
+    Error OnEvaluateContextCompleted();
     bool IsInitialized() { return is_initialized_; }
+    uint8_t EP0MaxPacketSize() const { return ep0_max_packet_size_; }
+    int InitializePhase() const { return initialize_phase_; }
     EndpointConfig *EndpointConfigs() { return ep_configs_.data(); }
     int NumEndpointConfigs() { return num_ep_configs_; }
     Error OnEndpointsConfigured();
@@ -59,12 +62,14 @@ class Device {
 
     bool is_initialized_ = false;
     int initialize_phase_ = 0;
+    uint8_t ep0_max_packet_size_ = 8;  // InitializePhase1 で設定
     std::array<EndpointConfig, 16> ep_configs_;
     int num_ep_configs_;
     Error InitializePhase1(const uint8_t *buf, int len);
     Error InitializePhase2(const uint8_t *buf, int len);
     Error InitializePhase3(uint8_t config_value);
     Error InitializePhase4();
+    Error InitializePhase1b(const uint8_t *buf, int len);
 
     /** OnControlCompleted の中で要求の発行元を特定するためのマップ構造．
      * ControlOut または ControlIn を発行したときに発行元が登録される．
