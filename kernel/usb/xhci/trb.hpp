@@ -248,19 +248,48 @@ union AddressDeviceCommandTRB {
         uint32_t slot_id : 8;
     } __attribute__((packed)) bits;
 
-    AddressDeviceCommandTRB(const InputContext *input_context,
-                            uint8_t slot_id) {
+    AddressDeviceCommandTRB(const void *input_context, uint8_t slot_id) {
         bits.trb_type = Type;
         bits.slot_id = slot_id;
         SetPointer(input_context);
     }
 
-    InputContext *Pointer() const {
-        return reinterpret_cast<InputContext *>(bits.input_context_pointer
-                                                << 4);
+    void *Pointer() const {
+        return reinterpret_cast<void *>(bits.input_context_pointer << 4);
     }
 
-    void SetPointer(const InputContext *p) {
+    void SetPointer(const void *p) {
+        bits.input_context_pointer = reinterpret_cast<uint64_t>(p) >> 4;
+    }
+};
+
+union EvaluateContextCommandTRB {
+    static const unsigned int Type = 13;
+    std::array<uint32_t, 4> data{};
+    struct {
+        uint64_t : 4;
+        uint64_t input_context_pointer : 60;
+
+        uint32_t : 32;
+
+        uint32_t cycle_bit : 1;
+        uint32_t : 9;
+        uint32_t trb_type : 6;
+        uint32_t : 8;
+        uint32_t slot_id : 8;
+    } __attribute__((packed)) bits;
+
+    EvaluateContextCommandTRB(const void *input_context, uint8_t slot_id) {
+        bits.trb_type = Type;
+        bits.slot_id = slot_id;
+        SetPointer(input_context);
+    }
+
+    void *Pointer() const {
+        return reinterpret_cast<void *>(bits.input_context_pointer << 4);
+    }
+
+    void SetPointer(const void *p) {
         bits.input_context_pointer = reinterpret_cast<uint64_t>(p) >> 4;
     }
 };
@@ -282,19 +311,17 @@ union ConfigureEndpointCommandTRB {
         uint32_t slot_id : 8;
     } __attribute__((packed)) bits;
 
-    ConfigureEndpointCommandTRB(const InputContext *input_context,
-                                uint8_t slot_id) {
+    ConfigureEndpointCommandTRB(const void *input_context, uint8_t slot_id) {
         bits.trb_type = Type;
         bits.slot_id = slot_id;
         SetPointer(input_context);
     }
 
-    InputContext *Pointer() const {
-        return reinterpret_cast<InputContext *>(bits.input_context_pointer
-                                                << 4);
+    void *Pointer() const {
+        return reinterpret_cast<void *>(bits.input_context_pointer << 4);
     }
 
-    void SetPointer(const InputContext *p) {
+    void SetPointer(const void *p) {
         bits.input_context_pointer = reinterpret_cast<uint64_t>(p) >> 4;
     }
 };

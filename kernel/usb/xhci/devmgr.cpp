@@ -3,8 +3,9 @@
 #include "usb/memory.hpp"
 
 namespace usb::xhci {
-Error DeviceManager::Initialize(size_t max_slots) {
+Error DeviceManager::Initialize(size_t max_slots, bool csz) {
     max_slots_ = max_slots;
+    csz_ = csz;
 
     devices_ = AllocArray<Device *>(max_slots_ + 1, 0, 0);
     if (devices_ == nullptr) {
@@ -12,7 +13,7 @@ Error DeviceManager::Initialize(size_t max_slots) {
     }
 
     device_context_pointers_ =
-        AllocArray<DeviceContext *>(max_slots_ + 1, 64, 4096);
+        AllocArray<void *>(max_slots_ + 1, 64, 4096);
     if (device_context_pointers_ == nullptr) {
         FreeMem(devices_);
         return MAKE_ERROR(Error::kNoEnoughMemory);
@@ -26,7 +27,7 @@ Error DeviceManager::Initialize(size_t max_slots) {
     return MAKE_ERROR(Error::kSuccess);
 }
 
-DeviceContext **DeviceManager::DeviceContexts() const {
+void **DeviceManager::DeviceContexts() const {
     return device_context_pointers_;
 }
 
@@ -35,8 +36,7 @@ Device *DeviceManager::FindByPort(uint8_t port_num,
     for (size_t i = 1; i <= max_slots_; ++i) {
         auto dev = devices_[i];
         if (dev == nullptr) continue;
-        if (dev->DeviceContext()->slot_context.bits.root_hub_port_num ==
-            port_num) {
+        if (dev->SlotCtx()->bits.root_hub_port_num == port_num) {
             return dev;
         }
     }
@@ -61,15 +61,6 @@ Device *DeviceManager::FindBySlot(uint8_t slot_id) const {
     return devices_[slot_id];
 }
 
-/*
-WithError<Device*> DeviceManager::Get(uint8_t device_id) const {
-  if (device_id >= num_devices_) {
-    return {nullptr, Error::kInvalidDeviceId};
-  }
-  return {&devices_[device_id], Error::kSuccess};
-}
-*/
-
 Error DeviceManager::AllocDevice(uint8_t slot_id, DoorbellRegister *dbreg) {
     if (slot_id > max_slots_) {
         return MAKE_ERROR(Error::kInvalidSlotID);
@@ -80,7 +71,7 @@ Error DeviceManager::AllocDevice(uint8_t slot_id, DoorbellRegister *dbreg) {
     }
 
     devices_[slot_id] = AllocArray<Device>(1, 64, 4096);
-    new (devices_[slot_id]) Device(slot_id, dbreg);
+    new (devices_[slot_id]) Device(slot_id, dbreg, csz_);
     return MAKE_ERROR(Error::kSuccess);
 }
 
@@ -96,6 +87,9 @@ Error DeviceManager::LoadDCBAA(uint8_t slot_id) {
 
 Error DeviceManager::Remove(uint8_t slot_id) {
     device_context_pointers_[slot_id] = nullptr;
+    if (devices_[slot_id]) {
+        devices_[slot_id]->~Device();
+    }
     FreeMem(devices_[slot_id]);
     devices_[slot_id] = nullptr;
     return MAKE_ERROR(Error::kSuccess);

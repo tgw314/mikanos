@@ -82,11 +82,6 @@ struct DeviceContextIndex {
     DeviceContextIndex &operator=(const DeviceContextIndex &rhs) = default;
 };
 
-struct DeviceContext {
-    SlotContext slot_context;
-    EndpointContext ep_contexts[31];
-} __attribute__((packed));
-
 struct InputControlContext {
     uint32_t drop_context_flags;
     uint32_t add_context_flags;
@@ -97,28 +92,59 @@ struct InputControlContext {
     uint8_t reserved2;
 } __attribute__((packed));
 
-struct InputContext {
-    InputControlContext input_control_context;
-    SlotContext slot_context;
-    EndpointContext ep_contexts[31];
+static_assert(sizeof(InputControlContext) == 32, "InputControlContext must be 32 bytes");
+static_assert(sizeof(SlotContext) == 32, "SlotContext must be 32 bytes");
+static_assert(sizeof(EndpointContext) == 32, "EndpointContext must be 32 bytes");
 
-    /** @brief Enable the slot context.
-     *
-     * @return Pointer to the slot context enabled.
-     */
-    SlotContext *EnableSlotContext() {
-        input_control_context.add_context_flags |= 1;
-        return &slot_context;
-    }
+inline size_t CalcContextSize(bool csz) {
+    return csz ? 64 : 32;
+}
 
-    /** @brief Enable an endpoint.
-     *
-     * @param dci Device Context Index (1 .. 31)
-     * @return Pointer to the endpoint context enabled.
-     */
-    EndpointContext *EnableEndpoint(DeviceContextIndex dci) {
-        input_control_context.add_context_flags |= 1u << dci.value;
-        return &ep_contexts[dci.value - 1];
-    }
-} __attribute__((packed));
+inline size_t CalcDeviceContextSize(bool csz) {
+    return CalcContextSize(csz) * (1 + 31);
+}
+
+inline size_t CalcInputContextSize(bool csz) {
+    return CalcContextSize(csz) * (1 + 1 + 31);
+}
+
+inline SlotContext *GetSlotContext(void *device_ctx) {
+    return reinterpret_cast<SlotContext *>(device_ctx);
+}
+
+inline const SlotContext *GetSlotContext(const void *device_ctx) {
+    return reinterpret_cast<const SlotContext *>(device_ctx);
+}
+
+inline EndpointContext *GetEndpointContext(void *device_ctx, int dci, bool csz) {
+    size_t ctx_size = CalcContextSize(csz);
+    return reinterpret_cast<EndpointContext *>(
+        reinterpret_cast<uint8_t *>(device_ctx) + ctx_size * dci);
+}
+
+inline const EndpointContext *GetEndpointContext(const void *device_ctx, int dci, bool csz) {
+    size_t ctx_size = CalcContextSize(csz);
+    return reinterpret_cast<const EndpointContext *>(
+        reinterpret_cast<const uint8_t *>(device_ctx) + ctx_size * dci);
+}
+
+inline InputControlContext *GetInputControlContext(void *input_ctx) {
+    return reinterpret_cast<InputControlContext *>(input_ctx);
+}
+
+inline SlotContext *GetInputSlotContext(void *input_ctx, bool csz) {
+    size_t ctx_size = CalcContextSize(csz);
+    return reinterpret_cast<SlotContext *>(
+        reinterpret_cast<uint8_t *>(input_ctx) + ctx_size);
+}
+
+inline EndpointContext *GetInputEndpointContext(void *input_ctx, int dci, bool csz) {
+    size_t ctx_size = CalcContextSize(csz);
+    return reinterpret_cast<EndpointContext *>(
+        reinterpret_cast<uint8_t *>(input_ctx) + ctx_size * (1 + dci));
+}
+
+inline void *GetInputContextForCommand(void *input_ctx, bool csz) {
+    return input_ctx;
+}
 }  // namespace usb::xhci

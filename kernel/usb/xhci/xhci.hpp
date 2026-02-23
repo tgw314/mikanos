@@ -27,6 +27,7 @@ class Controller {
     }
     uint8_t MaxPorts() const { return max_ports_; }
     DeviceManager *DeviceManager() { return &devmgr_; }
+    bool CSZ() const { return csz_; }
 
    private:
     static const size_t kDeviceSize = 8;
@@ -35,6 +36,7 @@ class Controller {
     CapabilityRegisters *const cap_;
     OperationalRegisters *const op_;
     const uint8_t max_ports_;
+    bool csz_;
 
     class DeviceManager devmgr_;
     Ring cr_;

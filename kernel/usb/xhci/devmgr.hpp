@@ -16,23 +16,21 @@
 namespace usb::xhci {
 class DeviceManager {
    public:
-    Error Initialize(size_t max_slots);
-    DeviceContext **DeviceContexts() const;
+    Error Initialize(size_t max_slots, bool csz);
+    void **DeviceContexts() const;
     Device *FindByPort(uint8_t port_num, uint32_t route_string) const;
     Device *FindByState(enum Device::State state) const;
     Device *FindBySlot(uint8_t slot_id) const;
-    // WithError<Device*> Get(uint8_t device_id) const;
     Error AllocDevice(uint8_t slot_id, DoorbellRegister *dbreg);
     Error LoadDCBAA(uint8_t slot_id);
     Error Remove(uint8_t slot_id);
+    bool CSZ() const { return csz_; }
 
    private:
-    // device_context_pointers_ can be used as DCBAAP's value.
-    // The number of elements is max_slots_ + 1.
-    DeviceContext **device_context_pointers_;
+    void **device_context_pointers_;
     size_t max_slots_;
+    bool csz_;
 
-    // The number of elements is max_slots_ + 1.
     Device **devices_;
 };
 }  // namespace usb::xhci

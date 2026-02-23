@@ -26,14 +26,22 @@ class Device : public usb::Device {
                                            int trb_transfer_length,
                                            TRB *issue_trb);
 
-    Device(uint8_t slot_id, DoorbellRegister *dbreg);
+    Device(uint8_t slot_id, DoorbellRegister *dbreg, bool csz);
+    ~Device();
 
     Error Initialize();
 
-    DeviceContext *DeviceContext() { return &ctx_; }
-    InputContext *InputContext() { return &input_ctx_; }
-    // usb::Device* USBDevice() { return usb_device_; }
-    // void SetUSBDevice(usb::Device* value) { usb_device_ = value; }
+    void *DeviceContext() { return ctx_; }
+    void *InputContext() { return input_ctx_; }
+    bool CSZ() const { return csz_; }
+
+    SlotContext *SlotCtx() { return GetSlotContext(ctx_); }
+    const SlotContext *SlotCtx() const { return GetSlotContext(ctx_); }
+    EndpointContext *EndpointCtx(int dci) { return GetEndpointContext(ctx_, dci, csz_); }
+
+    InputControlContext *InputCtrlCtx() { return GetInputControlContext(input_ctx_); }
+    SlotContext *InputSlotCtx() { return GetInputSlotContext(input_ctx_, csz_); }
+    EndpointContext *InputEndpointCtx(int dci) { return GetInputEndpointContext(input_ctx_, dci, csz_); }
 
     State State() const { return state_; }
     uint8_t SlotID() const { return slot_id_; }
@@ -51,20 +59,16 @@ class Device : public usb::Device {
     Error OnTransferEventReceived(const TransferEventTRB &trb);
 
    private:
-    alignas(64) struct DeviceContext ctx_;
-    alignas(64) struct InputContext input_ctx_;
+    void *ctx_;
+    void *input_ctx_;
+    bool csz_;
 
     const uint8_t slot_id_;
     DoorbellRegister *const dbreg_;
 
     enum State state_;
-    std::array<Ring *, 31> transfer_rings_;  // index = dci - 1
+    std::array<Ring *, 31> transfer_rings_{};  // index = dci - 1
 
-    /** コントロール転送が完了した際に DataStageTRB や StatusStageTRB
-     * から対応する SetupStageTRB を検索するためのマップ．
-     */
     ArrayMap<const void *, const SetupStageTRB *, 16> setup_stage_map_{};
-
-    // usb::Device* usb_device_;
 };
 }  // namespace usb::xhci

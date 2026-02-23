@@ -70,8 +70,25 @@ void Log(LogLevel level, const TransferEventTRB &trb) {
 }  // namespace
 
 namespace usb::xhci {
-Device::Device(uint8_t slot_id, DoorbellRegister *dbreg)
-    : slot_id_{slot_id}, dbreg_{dbreg} {}
+Device::Device(uint8_t slot_id, DoorbellRegister *dbreg, bool csz)
+    : ctx_{nullptr}, input_ctx_{nullptr}, csz_{csz},
+      slot_id_{slot_id}, dbreg_{dbreg} {
+    size_t ctx_size = CalcDeviceContextSize(csz);
+    size_t input_ctx_size = CalcInputContextSize(csz);
+    ctx_ = AllocMem(ctx_size, 64, 4096);
+    input_ctx_ = AllocMem(input_ctx_size, 64, 4096);
+}
+
+Device::~Device() {
+    for (auto tr : transfer_rings_) {
+        if (tr) {
+            tr->~Ring();
+            FreeMem(tr);
+        }
+    }
+    FreeMem(ctx_);
+    FreeMem(input_ctx_);
+}
 
 Error Device::Initialize() {
     state_ = State::kBlank;
@@ -88,6 +105,7 @@ Ring *Device::AllocTransferRing(DeviceContextIndex index, size_t buf_size) {
     int i = index.value - 1;
     auto tr = AllocArray<Ring>(1, 64, 4096);
     if (tr) {
+        new (tr) Ring();
         tr->Initialize(buf_size);
     }
     transfer_rings_[i] = tr;
@@ -101,8 +119,8 @@ Error Device::ControlIn(EndpointID ep_id, SetupData setup_data, void *buf,
         return err;
     }
 
-    Log(kDebug, "Device::ControlIn: ep addr %d, buf 0x%08x, len %d\n",
-        ep_id.Address(), buf, len);
+    Log(kDebug, "ControlIn: slot=%d, ep=%d, len=%d, buf=%p\n",
+        slot_id_, ep_id.Address(), len, buf);
     if (ep_id.Number() < 0 || 15 < ep_id.Number()) {
         return MAKE_ERROR(Error::kInvalidEndpointNumber);
     }
@@ -230,7 +248,8 @@ Error Device::OnTransferEventReceived(const TransferEventTRB &trb) {
 
     if (trb.bits.completion_code != 1 /* Success */ &&
         trb.bits.completion_code != 13 /* Short Packet */) {
-        Log(kDebug, trb);
+        Log(kError, "TransferFailed: cc=%d\n", trb.bits.completion_code);
+        Log(kError, trb);
         return MAKE_ERROR(Error::kTransferFailed);
     }
     Log(kDebug, trb);
@@ -268,6 +287,8 @@ Error Device::OnTransferEventReceived(const TransferEventTRB &trb) {
         data_stage_buffer = data_stage_trb->Pointer();
         transfer_length =
             data_stage_trb->bits.trb_transfer_length - residual_length;
+        Log(kDebug, "DataStage: req_len=%d, residual=%d, actual=%d\n",
+            data_stage_trb->bits.trb_transfer_length, residual_length, transfer_length);
     } else if (auto status_stage_trb =
                    TRBDynamicCast<StatusStageTRB>(issuer_trb)) {
         // pass
