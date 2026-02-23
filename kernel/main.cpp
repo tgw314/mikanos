@@ -132,9 +132,13 @@ extern "C" void KernelMain(const FrameBufferConfig &frame_buffer_config) {
     pci::Device *xhc_dev = nullptr;
     for (int i = 0; i < pci::num_device; i++) {
         if (pci::devices[i].class_code.Match(0x0cu, 0x03u, 0x30u)) {
+            auto vendor_id = pci::ReadVendorId(pci::devices[i]);
+            Log(kInfo, "xHCI candidate: %d.%d.%d vendor=%04x\n",
+                pci::devices[i].bus, pci::devices[i].device,
+                pci::devices[i].function, vendor_id);
             xhc_dev = &pci::devices[i];
 
-            if (0x8086 == pci::ReadVendorId(*xhc_dev)) {
+            if (vendor_id == 0x8086 || vendor_id == 0x1022) {
                 break;
             }
         }
