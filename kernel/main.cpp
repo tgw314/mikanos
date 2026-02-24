@@ -12,10 +12,13 @@
 #include "logger.hpp"
 #include "memory_map.hpp"
 #include "mouse.hpp"
+#include "paging.hpp"
 #include "pci.hpp"
 #include "queue.hpp"
+#include "segment.hpp"
 #include "usb/classdriver/mouse.hpp"
 #include "usb/xhci/xhci.hpp"
+#include "x86_descriptor.hpp"
 
 const PixelColor kDesktopBGColor{45, 118, 237};
 const PixelColor kDesktopFGColor{255, 255, 255};
@@ -49,7 +52,7 @@ void MouseObserver(int8_t displacement_x, int8_t displacement_y) {
 void SwitchEhci2Xhci(const pci::Device &xhc_dev) {
     bool intel_ehc_exist = false;
     for (int i = 0; i < pci::num_device; i++) {
-        if (pci::devices[i].class_code.Match(0x0cu, 0x03u, 0x20u) /* EHIC */ &&
+        if (pci::devices[i].class_code.Match(0x0cu, 0x03u, 0x20u) /* EHCI */ &&
             0x8086 == pci::ReadVendorId(pci::devices[i])) {
             intel_ehc_exist = true;
             break;
@@ -81,8 +84,14 @@ __attribute__((interrupt)) void IntHandlerXHCI(InterruptFrame *frame) {
     NotifyEndOfInterrupt();
 }
 
-extern "C" void KernelMain(const FrameBufferConfig &frame_buffer_config,
-                           const MemoryMap &memory_map) {
+alignas(16) uint8_t kernel_main_stack[1024 * 1024];
+
+extern "C" void KernelMainNewStack(
+    const FrameBufferConfig &frame_buffer_config_ref,
+    const MemoryMap &memory_map_ref) {
+    FrameBufferConfig frame_buffer_config{frame_buffer_config_ref};
+    MemoryMap memory_map{memory_map_ref};
+
     switch (frame_buffer_config.pixel_format) {
         case kPixelRGBResv8BitPerColor:
             pixel_writer = new (pixel_writer_buf)
@@ -112,27 +121,27 @@ extern "C" void KernelMain(const FrameBufferConfig &frame_buffer_config,
     printk("Welcome to MikanOS!\n");
     SetLogLevel(kInfo);
 
-    const std::array available_memory_types{
-        MemoryType::kEfiBootServicesCode,
-        MemoryType::kEfiBootServicesData,
-        MemoryType::kEfiConventionalMemory,
-    };
+    SetupSegments();
 
-    printk("memory_map: %p\n", &memory_map);
-    for (uintptr_t iter = reinterpret_cast<uintptr_t>(memory_map.buffer);
-         iter <
-         reinterpret_cast<uintptr_t>(memory_map.buffer) + memory_map.map_size;
+    const uint16_t kernel_cs = 1 << 3;
+    const uint16_t kernel_ss = 2 << 3;
+    SetDSAll(0);
+    SetCSSS(kernel_cs, kernel_ss);
+
+    SetupIdentityPageTable();
+
+    const auto memory_map_base = reinterpret_cast<uintptr_t>(memory_map.buffer);
+    for (uintptr_t iter = memory_map_base;
+         iter < memory_map_base + memory_map.map_size;
          iter += memory_map.descriptor_size) {
         auto desc = reinterpret_cast<MemoryDescriptor *>(iter);
-        for (int i = 0; i < available_memory_types.size(); i++) {
-            if (desc->type == available_memory_types[i]) {
-                printk(
-                    "type = %u, phys = %08lx - %08lx, pages = %lu, attr = "
-                    "%08lx\n",
-                    desc->type, desc->physical_start,
-                    desc->physical_start + desc->number_of_pages * 4096 - 1,
-                    desc->number_of_pages, desc->attribute);
-            }
+        if (IsAvailable(static_cast<MemoryType>(desc->type))) {
+            printk(
+                "type = %u, phys = %08lx - %08lx, pages = %lu, attr = "
+                "%08lx\n",
+                desc->type, desc->physical_start,
+                desc->physical_start + desc->number_of_pages * 4096 - 1,
+                desc->number_of_pages, desc->attribute);
         }
     }
 
@@ -154,7 +163,7 @@ extern "C" void KernelMain(const FrameBufferConfig &frame_buffer_config,
             dev.device, dev.function, vendor_id, class_code, dev.header_type);
     }
 
-    // Intel 製を優先して xHC を探す
+    // Intel, AMD 製を優先して xHC を探す
     pci::Device *xhc_dev = nullptr;
     for (int i = 0; i < pci::num_device; i++) {
         if (pci::devices[i].class_code.Match(0x0cu, 0x03u, 0x30u)) {
@@ -175,10 +184,9 @@ extern "C" void KernelMain(const FrameBufferConfig &frame_buffer_config,
             xhc_dev->device, xhc_dev->function);
     }
 
-    const uint16_t cs = GetCS();
     SetIDTEntry(idt[InterruptVector::kXHCI],
                 MakeIDTAttr(DescriptorType::kInterruptGate, 0),
-                reinterpret_cast<uint64_t>(IntHandlerXHCI), cs);
+                reinterpret_cast<uint64_t>(IntHandlerXHCI), kernel_cs);
     LoadIDT(sizeof(idt) - 1, reinterpret_cast<uintptr_t>(&idt[0]));
 
     const uint8_t bsp_local_apic_id =

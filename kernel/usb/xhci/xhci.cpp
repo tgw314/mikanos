@@ -1,10 +1,22 @@
 #include "usb/xhci/xhci.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstring>
+
+#include "error.hpp"
 #include "logger.hpp"
-#include "usb/descriptor.hpp"
-#include "usb/device.hpp"
-#include "usb/setupdata.hpp"
+#include "register.hpp"
+#include "usb/endpoint.hpp"
+#include "usb/memory.hpp"
+#include "usb/xhci/context.hpp"
+#include "usb/xhci/device.hpp"
+#include "usb/xhci/port.hpp"
+#include "usb/xhci/registers.hpp"
+#include "usb/xhci/ring.hpp"
 #include "usb/xhci/speed.hpp"
+#include "usb/xhci/trb.hpp"
 
 namespace {
 using namespace usb::xhci;
@@ -88,9 +100,8 @@ void InitializeEP0Context(EndpointContext &ctx, Ring *transfer_ring,
 
 Error ResetPort(Controller &xhc, Port &port) {
     const bool is_connected = port.IsConnected();
-    Log(kDebug, "ResetPort: port=%d, connected=%s, speed=%d\n",
-        port.Number(), is_connected ? "true" : "false",
-        is_connected ? port.Speed() : -1);
+    Log(kDebug, "ResetPort: port=%d, connected=%s, speed=%d\n", port.Number(),
+        is_connected ? "true" : "false", is_connected ? port.Speed() : -1);
 
     if (!is_connected) {
         return MAKE_ERROR(Error::kSuccess);
@@ -140,8 +151,8 @@ Error AddressDevice(Controller &xhc, uint8_t port_id, uint8_t slot_id) {
         return MAKE_ERROR(Error::kInvalidSlotID);
     }
 
-    Log(kDebug, "Device: dev=%p, ctx=%p, input_ctx=%p\n",
-        dev, dev->DeviceContext(), dev->InputContext());
+    Log(kDebug, "Device: dev=%p, ctx=%p, input_ctx=%p\n", dev,
+        dev->DeviceContext(), dev->InputContext());
 
     memset(dev->InputContext(), 0, CalcInputContextSize(dev->CSZ()));
 
@@ -154,8 +165,8 @@ Error AddressDevice(Controller &xhc, uint8_t port_id, uint8_t slot_id) {
     auto port = xhc.PortAt(port_id);
     InitializeSlotContext(*slot_ctx, port);
 
-    Log(kDebug, "SlotCtx: dw0=%08x, dw1=%08x\n",
-        slot_ctx->dwords[0], slot_ctx->dwords[1]);
+    Log(kDebug, "SlotCtx: dw0=%08x, dw1=%08x\n", slot_ctx->dwords[0],
+        slot_ctx->dwords[1]);
 
     auto tr = dev->AllocTransferRing(ep0_dci, 32);
     Log(kDebug, "TransferRing: tr=%p, buf=%p\n", tr, tr->Buffer());
@@ -164,8 +175,8 @@ Error AddressDevice(Controller &xhc, uint8_t port_id, uint8_t slot_id) {
         *ep0_ctx, tr,
         DetermineMaxPacketSizeForControlPipe(slot_ctx->bits.speed));
 
-    Log(kDebug, "EP0Ctx: dw0=%08x, dw1=%08x, dw2=%08x\n",
-        ep0_ctx->dwords[0], ep0_ctx->dwords[1], ep0_ctx->dwords[2]);
+    Log(kDebug, "EP0Ctx: dw0=%08x, dw1=%08x, dw2=%08x\n", ep0_ctx->dwords[0],
+        ep0_ctx->dwords[1], ep0_ctx->dwords[2]);
 
     xhc.DeviceManager()->LoadDCBAA(slot_id);
 
@@ -213,8 +224,8 @@ Error OnEvent(Controller &xhc, PortStatusChangeEventTRB &trb) {
     auto port_id = trb.bits.port_id;
     auto port = xhc.PortAt(port_id);
 
-    Log(kDebug, "PortStatusChange: port=%d, phase=%d, speed=%d\n",
-        port_id, static_cast<int>(port_config_phase[port_id]), port.Speed());
+    Log(kDebug, "PortStatusChange: port=%d, phase=%d, speed=%d\n", port_id,
+        static_cast<int>(port_config_phase[port_id]), port.Speed());
     switch (port_config_phase[port_id]) {
         case ConfigPhase::kNotConnected:
             return ResetPort(xhc, port);
@@ -232,8 +243,8 @@ Error OnEvent(Controller &xhc, PortStatusChangeEventTRB &trb) {
 
 Error OnEvent(Controller &xhc, TransferEventTRB &trb) {
     const uint8_t slot_id = trb.bits.slot_id;
-    Log(kDebug, "TransferEvent: slot=%d, cc=%d, len=%d\n",
-        slot_id, trb.bits.completion_code, trb.bits.trb_transfer_length);
+    Log(kDebug, "TransferEvent: slot=%d, cc=%d, len=%d\n", slot_id,
+        trb.bits.completion_code, trb.bits.trb_transfer_length);
     auto dev = xhc.DeviceManager()->FindBySlot(slot_id);
     if (dev == nullptr) {
         return MAKE_ERROR(Error::kInvalidSlotID);
@@ -242,13 +253,13 @@ Error OnEvent(Controller &xhc, TransferEventTRB &trb) {
         return err;
     }
 
-    const auto port_id =
-        dev->SlotCtx()->bits.root_hub_port_num;
+    const auto port_id = dev->SlotCtx()->bits.root_hub_port_num;
     if (port_config_phase[port_id] == ConfigPhase::kInitializingDevice) {
         if (dev->IsInitialized()) {
             return ConfigureEndpoints(xhc, *dev);
         }
-        // phase1 完了後（8バイト GetDescriptor が終わった）: Evaluate Context を発行
+        // phase1 完了後（8バイト GetDescriptor が終わった）: Evaluate Context
+        // を発行
         if (dev->InitializePhase() == 1) {
             const uint8_t ep0_max_packet_size = dev->EP0MaxPacketSize();
             Log(kDebug, "EvalCtx: slot=%d, phase=%d, EP0 max_packet_size=%d\n",
@@ -273,8 +284,8 @@ Error OnEvent(Controller &xhc, TransferEventTRB &trb) {
 Error OnEvent(Controller &xhc, CommandCompletionEventTRB &trb) {
     const auto issuer_type = trb.Pointer()->bits.trb_type;
     const auto slot_id = trb.bits.slot_id;
-    Log(kDebug, "CmdCompletion: slot=%d, type=%s, cc=%d\n",
-        trb.bits.slot_id, kTRBTypeToName[issuer_type], trb.bits.completion_code);
+    Log(kDebug, "CmdCompletion: slot=%d, type=%s, cc=%d\n", trb.bits.slot_id,
+        kTRBTypeToName[issuer_type], trb.bits.completion_code);
 
     if (issuer_type == EnableSlotCommandTRB::Type) {
         if (port_config_phase[addressing_port] != ConfigPhase::kEnablingSlot) {
@@ -289,7 +300,8 @@ Error OnEvent(Controller &xhc, CommandCompletionEventTRB &trb) {
         }
 
         auto slot_ctx = dev->SlotCtx();
-        Log(kDebug, "AddrDevDone: slot=%d, ctx.dw0=%08x, ctx.dw1=%08x, port_num=%d\n",
+        Log(kDebug,
+            "AddrDevDone: slot=%d, ctx.dw0=%08x, ctx.dw1=%08x, port_num=%d\n",
             slot_id, slot_ctx->dwords[0], slot_ctx->dwords[1],
             slot_ctx->bits.root_hub_port_num);
         auto port_id = slot_ctx->bits.root_hub_port_num;

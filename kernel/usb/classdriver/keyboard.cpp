@@ -1,7 +1,12 @@
 #include "usb/classdriver/keyboard.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 
+#include "error.hpp"
+#include "usb/classdriver/hid.hpp"
 #include "usb/device.hpp"
 #include "usb/memory.hpp"
 

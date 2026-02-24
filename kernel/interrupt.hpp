@@ -3,17 +3,7 @@
 #include <array>
 #include <cstdint>
 
-enum class DescriptorType {
-    // clang-format off
-    kUpper8Bytes   = 0,
-    kLDT           = 2,
-    kTSSAvaliable  = 9,
-    kTSSBusy       = 11,
-    kCallGate      = 12,
-    kInterruptGate = 14,
-    kTrapGate      = 15,
-    // clang-format on
-};
+#include "x86_descriptor.hpp"
 
 union InterruptDescriptorAttribute {
     uint16_t data;

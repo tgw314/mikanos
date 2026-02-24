@@ -1,8 +1,16 @@
 #include "usb/xhci/device.hpp"
+#include <cstddef>
+#include <cstdint>
 
+#include "error.hpp"
 #include "logger.hpp"
+#include "usb/device.hpp"
 #include "usb/memory.hpp"
+#include "usb/setupdata.hpp"
+#include "usb/xhci/context.hpp"
+#include "usb/xhci/registers.hpp"
 #include "usb/xhci/ring.hpp"
+#include "usb/xhci/trb.hpp"
 
 namespace {
 using namespace usb::xhci;

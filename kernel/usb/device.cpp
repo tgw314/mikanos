@@ -1,10 +1,13 @@
 #include "usb/device.hpp"
+#include <cstdint>
 
+#include "error.hpp"
 #include "logger.hpp"
 #include "usb/classdriver/base.hpp"
 #include "usb/classdriver/keyboard.hpp"
 #include "usb/classdriver/mouse.hpp"
 #include "usb/descriptor.hpp"
+#include "usb/endpoint.hpp"
 #include "usb/setupdata.hpp"
 
 namespace {

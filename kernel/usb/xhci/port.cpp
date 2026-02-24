@@ -1,7 +1,8 @@
 #include "usb/xhci/port.hpp"
+#include <cstdint>
 
+#include "error.hpp"
 #include "usb/xhci/registers.hpp"
-#include "usb/xhci/xhci.hpp"
 
 namespace usb::xhci {
 uint8_t Port::Number() const { return port_num_; }

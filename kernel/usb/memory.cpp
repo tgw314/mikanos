@@ -1,5 +1,6 @@
 #include "usb/memory.hpp"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace {

@@ -1,8 +1,12 @@
 #include "usb/classdriver/mouse.hpp"
 
-#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 
+#include "error.hpp"
 #include "logger.hpp"
+#include "usb/classdriver/hid.hpp"
 #include "usb/device.hpp"
 #include "usb/memory.hpp"
 

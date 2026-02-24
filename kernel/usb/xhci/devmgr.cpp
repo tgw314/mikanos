@@ -1,6 +1,11 @@
 #include "usb/xhci/devmgr.hpp"
+#include <cstddef>
+#include <cstdint>
 
+#include "error.hpp"
 #include "usb/memory.hpp"
+#include "usb/xhci/device.hpp"
+#include "usb/xhci/registers.hpp"
 
 namespace usb::xhci {
 Error DeviceManager::Initialize(size_t max_slots, bool csz) {

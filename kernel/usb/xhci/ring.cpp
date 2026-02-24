@@ -1,6 +1,13 @@
 #include "usb/xhci/ring.hpp"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 
+#include "error.hpp"
 #include "usb/memory.hpp"
+#include "usb/xhci/registers.hpp"
+#include "usb/xhci/trb.hpp"
 
 namespace usb::xhci {
 Ring::~Ring() {

@@ -1,4 +1,5 @@
 #include "usb/xhci/registers.hpp"
+#include <cstdint>
 
 namespace {
 template <class Ptr, class Disp>

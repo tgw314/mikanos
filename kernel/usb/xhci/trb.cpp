@@ -1,4 +1,5 @@
 #include "usb/xhci/trb.hpp"
+#include <array>
 
 namespace usb::xhci {
 const std::array<const char *, 37> kTRBCompletionCodeToName{
