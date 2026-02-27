@@ -38,15 +38,15 @@ void DrawMouseCursor(PixelWriter *pixel_writer, Vector2D<int> position) {
         for (int dx = 0; dx < kMouseCursorWidth; dx++) {
             switch (mouse_cursor_shape[dy][dx]) {
                 case '@':
-                    pixel_writer->Write(position.x + dx, position.y + dy,
+                    pixel_writer->Write(position + Vector2D<int>{dx, dy},
                                         {0, 0, 0});
                     break;
                 case '.':
-                    pixel_writer->Write(position.x + dx, position.y + dy,
+                    pixel_writer->Write(position + Vector2D<int>{dx, dy},
                                         {255, 255, 255});
                     break;
                 default:
-                    pixel_writer->Write(position.x + dx, position.y + dy,
+                    pixel_writer->Write(position + Vector2D<int>{dx, dy},
                                         kMouseTransparentColor);
             }
         }
