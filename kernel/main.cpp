@@ -8,6 +8,7 @@
 #include "asmfunc.h"
 #include "console.hpp"
 #include "error.hpp"
+#include "font.hpp"
 #include "frame_buffer.hpp"
 #include "frame_buffer_config.hpp"
 #include "graphics.hpp"
@@ -266,6 +267,12 @@ extern "C" void KernelMainNewStack(
     mouse_window->SetTransparentColor(kMouseTransparentColor);
     DrawMouseCursor(mouse_window->Writer(), {0, 0});
 
+    auto main_window =
+        std::make_shared<Window>(160, 68, frame_buffer_config.pixel_format);
+    DrawWindow(*main_window->Writer(), "Hello Window");
+    WriteString(*main_window->Writer(), {24, 28}, "Welcome to", {0, 0, 0});
+    WriteString(*main_window->Writer(), {24, 44}, " MikanOS world!", {0, 0, 0});
+
     FrameBuffer screen;
     if (auto err = screen.Initialize(frame_buffer_config)) {
         Log(kError, "failed to Initialize frame buffer: %s at %s:%d\n",
@@ -284,10 +291,15 @@ extern "C" void KernelMainNewStack(
                          .SetWindow(mouse_window)
                          .Move(mouse_position)
                          .ID();
+    auto main_window_layer_id = layer_manager->NewLayer()
+                                    .SetWindow(main_window)
+                                    .Move({300, 100})
+                                    .ID();
     // clang-format on
 
     layer_manager->UpDown(bglayer_id, 0);
     layer_manager->UpDown(mouse_layer_id, 1);
+    layer_manager->UpDown(main_window_layer_id, 1);
     layer_manager->Draw();
 
     for (;;) {
