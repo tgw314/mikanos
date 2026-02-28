@@ -37,9 +37,9 @@ void Window::DrawTo(FrameBuffer &dst, Vector2D<int> position) {
     for (int y = 0; y < Height(); y++) {
         for (int x = 0; x < Width(); x++) {
             const auto c = At(Vector2D<int>{x, y});
-            if (c != tc) {
-                writer.Write(position + Vector2D<int>{x, y}, c);
-            }
+            if (c == tc) continue;
+
+            writer.Write(position + Vector2D<int>{x, y}, c);
         }
     }
 }
