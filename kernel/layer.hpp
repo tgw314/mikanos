@@ -23,6 +23,8 @@ class Layer {
     Layer &SetWindow(const std::shared_ptr<Window> &window);
     // 設定されたウィンドウを返す
     std::shared_ptr<Window> GetWindow() const;
+    // レイヤーの原点座標を取得する
+    Vector2D<int> GetPosition() const;
 
     // レイヤーの位置情報を指定された絶対座標へと更新する 再描画はしない
     Layer &Move(Vector2D<int> pos);
@@ -30,7 +32,7 @@ class Layer {
     Layer &MoveRelative(Vector2D<int> pos_diff);
 
     // 指定された描画先にウィンドウの内容を描画する
-    void DrawTo(FrameBuffer &screen) const;
+    void DrawTo(FrameBuffer &screen, const Rectangle<int> &area) const;
 
    private:
     unsigned int id_;
@@ -51,10 +53,13 @@ class LayerManager {
     Layer &NewLayer();
 
     // 現在表示状態にあるレイヤーを描画する
-    void Draw() const;
-    // レイヤーの位置情報を指定された絶対座標へと更新する 再描画はしない
-    void Move(unsigned int id, Vector2D<int> new_position);
-    // レイヤーの位置情報を指定された相対座標へと更新する 再描画はしない
+    void Draw(const Rectangle<int> &area) const;
+    // 指定したレイヤーに設定されているウィンドウの描画領域内を再描画する
+    void Draw(unsigned int id) const;
+
+    // レイヤーの位置情報を指定された絶対座標へと更新する 再描画する
+    void Move(unsigned int id, Vector2D<int> new_pos);
+    // レイヤーの位置情報を指定された相対座標へと更新する 再描画する
     void MoveRelative(unsigned int id, Vector2D<int> pos_diff);
 
     /** レイヤーの高さ方向の位置を指定された位置に移動する。
