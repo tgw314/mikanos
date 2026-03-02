@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
+
 #include "error.hpp"
 #include "usb/xhci/context.hpp"
 #include "usb/xhci/devmgr.hpp"
@@ -68,4 +69,8 @@ Error ConfigureEndpoints(Controller &xhc, Device &dev);
  * @return イベントを正常に処理できたら Error::kSuccess
  */
 Error ProcessEvent(Controller &xhc);
+
+extern Controller *controller;
+void Initialize();
+void ProcessEvents();
 }  // namespace usb::xhci

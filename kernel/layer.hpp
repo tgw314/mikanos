@@ -92,3 +92,5 @@ class LayerManager {
 };
 
 extern LayerManager *layer_manager;
+
+void InitializeLayer();
