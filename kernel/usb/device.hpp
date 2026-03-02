@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 
 #include "error.hpp"
 #include "usb/arraymap.hpp"

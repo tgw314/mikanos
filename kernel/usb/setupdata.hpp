@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace usb {
 namespace request_type {
 // bmRequestType recipient

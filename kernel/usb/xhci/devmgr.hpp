@@ -10,8 +10,8 @@
 #include <cstdint>
 
 #include "error.hpp"
-#include "usb/xhci/context.hpp"
 #include "usb/xhci/device.hpp"
+#include "usb/xhci/registers.hpp"
 
 namespace usb::xhci {
 class DeviceManager {

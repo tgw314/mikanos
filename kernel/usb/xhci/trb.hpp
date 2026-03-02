@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdint>
 
+#include "usb/endpoint.hpp"
 #include "usb/xhci/context.hpp"
 
 namespace usb::xhci {

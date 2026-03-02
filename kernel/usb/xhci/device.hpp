@@ -6,12 +6,15 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
 #include "error.hpp"
 #include "usb/arraymap.hpp"
 #include "usb/device.hpp"
+#include "usb/endpoint.hpp"
+#include "usb/setupdata.hpp"
 #include "usb/xhci/context.hpp"
 #include "usb/xhci/registers.hpp"
 #include "usb/xhci/trb.hpp"

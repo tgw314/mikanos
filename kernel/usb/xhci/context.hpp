@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include "usb/endpoint.hpp"
 
 namespace usb::xhci {

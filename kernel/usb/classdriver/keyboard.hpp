@@ -6,8 +6,13 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 
+#include "error.hpp"
+#include "usb/classdriver/base.hpp"
 #include "usb/classdriver/hid.hpp"
 
 namespace usb {

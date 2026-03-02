@@ -7,7 +7,9 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <optional>
+#include <utility>
 
 namespace usb {
 template <class K, class V, size_t N = 16>

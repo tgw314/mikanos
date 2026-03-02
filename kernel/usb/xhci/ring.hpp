@@ -6,11 +6,11 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
-#include <vector>
 
 #include "error.hpp"
-#include "usb/memory.hpp"
 #include "usb/xhci/registers.hpp"
 #include "usb/xhci/trb.hpp"
 

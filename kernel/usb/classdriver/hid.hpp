@@ -6,7 +6,13 @@
 
 #pragma once
 
+#include "error.hpp"
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include "usb/classdriver/base.hpp"
+#include "usb/endpoint.hpp"
+#include "usb/setupdata.hpp"
 
 namespace usb {
 class HIDBaseDriver : public ClassDriver {
