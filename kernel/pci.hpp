@@ -74,7 +74,7 @@ uint32_t ReadBusNumbers(uint8_t bus, uint8_t device, uint8_t function);
 bool IsSingleFunctionDevice(uint8_t header_type);
 
 // ScanAllBus() により発見された PCI デバイスの一覧
-inline std::array<Device, 32> devices;
+inline std::array<Device, 64> devices;
 // devices の有効な要素の数
 inline int num_device;
 

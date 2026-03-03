@@ -1,17 +1,12 @@
-#include <array>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <deque>
 #include <limits>
 #include <memory>
 
-#include "asmfunc.h"
 #include "console.hpp"
-#include "error.hpp"
 #include "font.hpp"
-#include "frame_buffer.hpp"
 #include "frame_buffer_config.hpp"
 #include "graphics.hpp"
 #include "interrupt.hpp"
@@ -23,12 +18,9 @@
 #include "mouse.hpp"
 #include "paging.hpp"
 #include "pci.hpp"
-#include "queue.hpp"
 #include "segment.hpp"
-#include "usb/classdriver/mouse.hpp"
 #include "usb/xhci/xhci.hpp"
 #include "window.hpp"
-#include "x86_descriptor.hpp"
 
 int printk(const char *format, ...) {
     va_list ap;
