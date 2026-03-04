@@ -3,3 +3,6 @@ Diagnostics:
 
   Includes:
     AnalyzeAngledIncludes: true
+
+CompileFlags:
+  Add: [-Wimplicit-fallthrough]

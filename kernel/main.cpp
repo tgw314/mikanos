@@ -81,7 +81,10 @@ extern "C" void KernelMainNewStack(
     InitializeMouse();
     layer_manager->Draw({{0, 0}, ScreenSize()});
 
-    InitializeLAPICTimer();
+    InitializeLAPICTimer(*main_queue);
+
+    timer_manager->AddTimer(Timer(200, 2));
+    timer_manager->AddTimer(Timer(600, -1));
 
     for (;;) {
         char str[128];
@@ -112,6 +115,14 @@ extern "C" void KernelMainNewStack(
                 break;
             case Message::kInterruptLAPICTimer:
                 printk("Timer interrupt\n");
+                break;
+            case Message::kTimerTimeout:
+                printk("Timer: timeout = %lu, value = %d\n",
+                       msg.arg.timer.timeout, msg.arg.timer.value);
+                if (msg.arg.timer.value > 0) {
+                    timer_manager->AddTimer(Timer(msg.arg.timer.timeout + 100,
+                                                  msg.arg.timer.value + 1));
+                }
                 break;
             default:
                 Log(kError, "Unknown message type: %d\n", msg.type);
