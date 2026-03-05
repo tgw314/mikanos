@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "asmfunc.h"
 #include "logger.hpp"
 
 namespace {
@@ -65,6 +66,18 @@ size_t XSDT::Count() const {
 }
 
 const FADT *fadt;
+
+void WaitMilliseconds(unsigned long msec) {
+    const bool pm_timer_is_32 = (fadt->flags >> 8) & 1;
+    const uint32_t start = IoIn32(fadt->pm_tmr_blk);
+    uint32_t end = start + kPMTimerFreq * msec / 1000;
+    if (!pm_timer_is_32) end &= 0x00ffffffu;
+
+    if (end < start) {  // overflow
+        while (IoIn32(fadt->pm_tmr_blk) >= start);
+    }
+    while (IoIn32(fadt->pm_tmr_blk) < end);
+}
 
 void Initialize(const RSDP &rsdp) {
     if (!rsdp.IsValid()) {
