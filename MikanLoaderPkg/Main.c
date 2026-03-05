@@ -3,6 +3,7 @@
 #include <Uefi/UefiSpec.h>
 
 #include <Base.h>
+#include <Guid/Acpi.h>
 #include <Guid/FileInfo.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
@@ -354,10 +355,19 @@ EFI_STATUS EFIAPI UefiMain(EFI_HANDLE image_handle,
             Halt();
     }
 
+    VOID *acpi_table = NULL;
+    for (UINTN i = 0; i < system_table->NumberOfTableEntries; i++) {
+        if (CompareGuid(&gEfiAcpiTableGuid,
+                        &system_table->ConfigurationTable[i].VendorGuid)) {
+            acpi_table = system_table->ConfigurationTable[i].VendorTable;
+            break;
+        }
+    }
+
     typedef void EntryPointType(const struct FrameBufferConfig *,
-                                const struct MemoryMap *);
+                                const struct MemoryMap *, const VOID *);
     EntryPointType *entry_point = (EntryPointType *)entry_addr;
-    entry_point(&config, &memmap);
+    entry_point(&config, &memmap, acpi_table);
 
     Print(L"All done\n");
 
