@@ -11,7 +11,7 @@ struct RSDP {
     uint8_t revision;
     uint32_t rsdt_address;
     uint32_t length;
-    uint32_t xsdt_address;
+    uint64_t xsdt_address;
     uint8_t extended_checksum;
     char reserved[3];
 
