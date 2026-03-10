@@ -108,7 +108,9 @@ void InputTextWindow(char c) {
         DrawTextCursor(true);
     }
 
+    __asm__("cli");
     layer_manager->Draw(text_window_layer_id);
+    __asm__("sti");
 }
 
 std::shared_ptr<Window> task_b_window;
@@ -133,10 +135,12 @@ void TaskB(int task_id, int data) {
     char str[128];
     for (int count = 0;; count++) {
         sprintf(str, "%010d", count);
+        __asm__("cli");
         FillRectangle(*task_b_window->Writer(), {24, 28}, {8 * 10, 16},
                       {0xc6, 0xc6, 0xc6});
         WriteString(*task_b_window->Writer(), {24, 28}, str, {0, 0, 0});
         layer_manager->Draw(task_b_window_layer_id);
+        __asm__("sti");
     }
 }
 
@@ -210,10 +214,12 @@ extern "C" void KernelMainNewStack(
         __asm__("sti");
 
         sprintf(str, "%010lu", tick);
+        __asm__("cli");
         FillRectangle(*main_window->Writer(), {24, 28}, {8 * 10, 16},
                       {0xc6, 0xc6, 0xc6});
         WriteString(*main_window->Writer(), {24, 28}, str, {0, 0, 0});
         layer_manager->Draw(main_window_layer_id);
+        __asm__("sti");
 
         __asm__("cli");
         if (main_queue->size() == 0) {
@@ -235,10 +241,10 @@ extern "C" void KernelMainNewStack(
                     timer_manager->AddTimer(
                         Timer{msg.arg.timer.timeout + kTimer500Ms,
                               kTextboxCursorTimer});
-                    __asm__("sti");
                     textbox_cursor_visible = !textbox_cursor_visible;
                     DrawTextCursor(textbox_cursor_visible);
                     layer_manager->Draw(text_window_layer_id);
+                    __asm__("sti");
                 }
                 break;
             case Message::kKeyPush:
