@@ -56,8 +56,7 @@ void LayerManager::SetWriter(FrameBuffer *screen) {
 }
 
 Layer &LayerManager::NewLayer() {
-    latest_id_++;
-    return *layers_.emplace_back(new Layer{latest_id_});
+    return *layers_.emplace_back(new Layer{++latest_id_});
 }
 
 void LayerManager::Draw(const Rectangle<int> &area) const {
