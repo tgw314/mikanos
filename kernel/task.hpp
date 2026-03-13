@@ -5,9 +5,11 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "error.hpp"
+#include "message.hpp"
 
 struct TaskContext {
     uint64_t cr3, rip, rflags, reserved1;             // offset 0x00
@@ -29,11 +31,14 @@ class Task {
     uint64_t ID() const;
     Task &Sleep();
     Task &Wakeup();
+    void SendMessage(const Message &msg);
+    std::optional<Message> RecieveMessage();
 
    private:
     uint64_t id_;
     std::vector<uint64_t> stack_;
     alignas(16) TaskContext context_;
+    std::deque<Message> msgs_;
 };
 
 class TaskManager {
@@ -46,6 +51,8 @@ class TaskManager {
     Error Sleep(uint64_t id);
     void Wakeup(Task *task);
     Error Wakeup(uint64_t id);
+    Error SendMessage(uint64_t id, const Message &msg);
+    Task &CurrentTask();
 
    private:
     std::vector<std::unique_ptr<Task>> tasks_{};

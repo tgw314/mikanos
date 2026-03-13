@@ -2,11 +2,11 @@
 
 #include <array>
 #include <cstdint>
-#include <deque>
 
 #include "asmfunc.h"
 #include "message.hpp"
 #include "segment.hpp"
+#include "task.hpp"
 #include "timer.hpp"
 #include "x86_descriptor.hpp"
 
@@ -27,10 +27,8 @@ void NotifyEndOfInterrupt() {
 }
 
 namespace {
-std::deque<Message> *msg_queue;
-
 __attribute__((interrupt)) void IntHandlerXHCI(InterruptFrame *frame) {
-    msg_queue->push_back(Message{Message::kInterruptXHCI});
+    task_manager->SendMessage(1, Message{Message::kInterruptXHCI});
     NotifyEndOfInterrupt();
 }
 
@@ -39,9 +37,7 @@ __attribute__((interrupt)) void IntHandlerLAPICTimer(InterruptFrame *frame) {
 }
 }  // namespace
 
-void InitializeInterrupt(std::deque<Message> *msg_queue) {
-    ::msg_queue = msg_queue;
-
+void InitializeInterrupt() {
     SetIDTEntry(idt[InterruptVector::kXHCI],
                 MakeIDTAttr(DescriptorType::kInterruptGate, 0),
                 reinterpret_cast<uint64_t>(IntHandlerXHCI), kKernelCS);
