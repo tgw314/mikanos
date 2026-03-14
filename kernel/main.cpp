@@ -206,7 +206,7 @@ extern "C" void KernelMainNewStack(
         __asm__("sti");
 
         __asm__("cli");
-        auto msg = main_task.RecieveMessage();
+        auto msg = main_task.ReceiveMessage();
         if (!msg) {
             main_task.Sleep();
             __asm__("sti");
