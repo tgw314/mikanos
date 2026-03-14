@@ -64,9 +64,7 @@ Mouse::Mouse(unsigned int layer_id) : layer_id_{layer_id} {}
 
 void Mouse::SetPosition(Vector2D<int> position) {
     position_ = position;
-    __asm__("cli");
     layer_manager->Move(layer_id_, position_);
-    __asm__("sti");
 }
 
 void Mouse::OnInterrupt(uint8_t buttons, int8_t displacement_x,
@@ -78,9 +76,7 @@ void Mouse::OnInterrupt(uint8_t buttons, int8_t displacement_x,
 
     const auto posdiff = position_ - oldpos;
 
-    __asm__("cli");
     layer_manager->Move(layer_id_, position_);
-    __asm__("sti");
 
     const bool previous_left_pressed = (previous_buttons_ & 0x01);
     const bool left_pressed = (buttons & 0x01);
@@ -91,9 +87,7 @@ void Mouse::OnInterrupt(uint8_t buttons, int8_t displacement_x,
         }
     } else if (previous_left_pressed && left_pressed) {
         if (drag_layer_id_ > 0) {
-            __asm__("cli");
             layer_manager->MoveRelative(drag_layer_id_, posdiff);
-            __asm__("sti");
         }
     } else if (previous_left_pressed && !left_pressed) {
         drag_layer_id_ = 0;
