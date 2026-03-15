@@ -5,6 +5,7 @@
 
 #include "frame_buffer.hpp"
 #include "graphics.hpp"
+#include "message.hpp"
 #include "window.hpp"
 
 /** Layer は 1 つの層を表す
@@ -94,3 +95,4 @@ class LayerManager {
 extern LayerManager *layer_manager;
 
 void InitializeLayer();
+void ProcessLayerMessage(const Message &msg);

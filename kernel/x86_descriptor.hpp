@@ -5,7 +5,7 @@ enum class DescriptorType {
     // system segment & gate descriptor types
     kUpper8Bytes   = 0,
     kLDT           = 2,
-    kTSSAvaliable  = 9,
+    kTSSAvailable  = 9,
     kTSSBusy       = 11,
     kCallGate      = 12,
     kInterruptGate = 14,
