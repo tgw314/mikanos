@@ -43,7 +43,7 @@ void SetDataSegment(SegmentDescriptor &desc, DescriptorType type,
 void SetupSegments() {
     gdt[0].data = 0;
     SetCodeSegment(gdt[1], DescriptorType::kExecuteRead, 0, 0, 0xfffff);
-    SetCodeSegment(gdt[2], DescriptorType::kReadWrite, 0, 0, 0xfffff);
+    SetDataSegment(gdt[2], DescriptorType::kReadWrite, 0, 0, 0xfffff);
     LoadGDT(sizeof(gdt) - 1, reinterpret_cast<uintptr_t>(&gdt[0]));
 }
 
