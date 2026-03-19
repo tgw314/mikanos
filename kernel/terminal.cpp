@@ -110,6 +110,13 @@ void Terminal::ExecuteLine() {
         return;
     }
 
+    if (strcmp(command, "clear") == 0) {
+        FillRectangle(*window_->InnerWriter(), {4, 4},
+                      {8 * kColumns, 16 * kRows}, {0, 0, 0});
+        cursor_.y = 0;
+        return;
+    }
+
     Print("no such command: ");
     Print(command);
     Print("\n");
