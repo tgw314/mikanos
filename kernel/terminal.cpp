@@ -25,6 +25,7 @@ Terminal::Terminal() {
         layer_manager->NewLayer().SetWindow(window_).SetDraggable(true).ID();
 
     Print(">");
+    cmd_history_.resize(8);
 }
 
 Rectangle<int> Terminal::BlinkCursor() {
@@ -50,41 +51,47 @@ Rectangle<int> Terminal::InputKey(uint8_t modifier, uint8_t keycode,
 
     Rectangle<int> draw_area{CalcCursorPos(), {8 * 2, 16}};
 
-    switch (ascii) {
-        case '\n':
-            linebuf_[linebuf_index_] = '\0';
-            linebuf_index_ = 0;
-            cursor_.x = 0;
-            if (cursor_.y < kRows - 1) {
-                cursor_.y++;
-            } else {
-                Scroll1();
-            }
-            ExecuteLine();
-            Print(">");
-            draw_area.pos = ToplevelWindow::kTopLeftMargin;
-            draw_area.size = window_->InnerSize();
-            break;
-        case '\b':
-            if (cursor_.x > 0) {
-                cursor_.x--;
-                FillRectangle(*window_->Writer(), CalcCursorPos(), {8, 16},
-                              {0, 0, 0});
-                draw_area.pos = CalcCursorPos();
+    if (ascii == '\n') {
+        linebuf_[linebuf_index_] = '\0';
+        if (linebuf_index_ > 0) {
+            cmd_history_.pop_back();
+            cmd_history_.push_front(linebuf_);
+        }
+        linebuf_index_ = 0;
+        cmd_history_index_ = -1;
 
-                if (linebuf_index_ > 0) linebuf_index_--;
-            }
-            break;
-        default:
-            if (ascii == 0) break;
-            if (cursor_.x < kColumns - 1 && linebuf_index_ < kLineMax - 1) {
-                linebuf_[linebuf_index_++] = ascii;
-                WriteAscii(*window_->Writer(), CalcCursorPos(), ascii,
-                           {255, 255, 255});
-                cursor_.x++;
-            }
+        cursor_.x = 0;
+        if (cursor_.y < kRows - 1) {
+            cursor_.y++;
+        } else {
+            Scroll1();
+        }
+        ExecuteLine();
+        Print(">");
+        draw_area.pos = ToplevelWindow::kTopLeftMargin;
+        draw_area.size = window_->InnerSize();
+    } else if (ascii == '\b') {
+        if (cursor_.x > 0) {
+            cursor_.x--;
+            FillRectangle(*window_->Writer(), CalcCursorPos(), {8, 16},
+                          {0, 0, 0});
+            draw_area.pos = CalcCursorPos();
+            if (linebuf_index_ > 0) linebuf_index_--;
+        }
+    } else if (ascii == 0) {
+        if (keycode == 0x51) {
+            draw_area = HistoryUpDown(-1);
+        } else if (keycode == 0x52) {
+            draw_area = HistoryUpDown(1);
+        }
+    } else {
+        if (cursor_.x < kColumns - 1 && linebuf_index_ < kLineMax - 1) {
+            linebuf_[linebuf_index_++] = ascii;
+            WriteAscii(*window_->Writer(), CalcCursorPos(), ascii,
+                       {255, 255, 255});
+            cursor_.x++;
+        }
     }
-
     DrawCursor(true);
     return draw_area;
 }
@@ -168,6 +175,32 @@ void Terminal::Print(const char *s) {
     }
 
     DrawCursor(true);
+}
+
+Rectangle<int> Terminal::HistoryUpDown(int direction) {
+    if (direction == -1 && cmd_history_index_ >= 0) {
+        cmd_history_index_--;
+    } else if (direction == 1 && cmd_history_index_ + 1 < cmd_history_.size()) {
+        cmd_history_index_++;
+    }
+
+    cursor_.x = 1;
+    const auto first_pos = CalcCursorPos();
+
+    Rectangle<int> draw_area{first_pos, {8 * (kColumns - 1), 16}};
+    FillRectangle(*window_->Writer(), draw_area.pos, draw_area.size, {0, 0, 0});
+
+    const char *history = "";
+    if (cmd_history_index_ >= 0) {
+        history = &cmd_history_[cmd_history_index_][0];
+    }
+
+    strcpy(&linebuf_[0], history);
+    linebuf_index_ = strlen(history);
+
+    WriteString(*window_->Writer(), first_pos, history, {255, 255, 255});
+    cursor_.x = linebuf_index_ + 1;
+    return draw_area;
 }
 
 void TaskTerminal(uint64_t task_id, int64_t data) {
