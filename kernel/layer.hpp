@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -113,6 +114,7 @@ class ActiveLayer {
 };
 
 extern ActiveLayer *active_layer;
+extern std::map<unsigned int, uint64_t> *layer_task_map;
 
 void InitializeLayer();
 void ProcessLayerMessage(const Message &msg);

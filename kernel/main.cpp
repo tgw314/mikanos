@@ -264,8 +264,18 @@ extern "C" void KernelMainNewStack(
                     break;
                 }
 
+                __asm__("cli");
+                auto task_it = layer_task_map->find(act);
+                __asm__("sti");
+                if (task_it != layer_task_map->end()) {
+                    __asm__("cli");
+                    task_manager->SendMessage(task_it->second, *msg);
+                    __asm__("sti");
+                    break;
+                }
+
                 printk("key push not handled: keycode %02x, ascii %02x\n",
-                       msg->arg.keyboard.keycode, msg->arg.keyboard.ascii);
+                       arg.keycode, arg.ascii);
                 break;
             }
             case Message::kLayer:

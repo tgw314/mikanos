@@ -2,9 +2,12 @@
 
 #include <cstdint>
 #include <memory>
+#include <utility>
 
+#include "font.hpp"
 #include "graphics.hpp"
 #include "layer.hpp"
+#include "logger.hpp"
 #include "message.hpp"
 #include "task.hpp"
 #include "window.hpp"
@@ -24,16 +27,71 @@ Rectangle<int> Terminal::BlinkCursor() {
     cursor_visible_ = !cursor_visible_;
     DrawCursor(cursor_visible_);
 
-    return {ToplevelWindow::kTopLeftMargin +
-                Vector2D<int>{4 + 8 * cursor_.x, 5 + 16 * cursor_.y},
-            {7, 15}};
+    return {CalcCursorPos(), {7, 15}};
 }
 
 void Terminal::DrawCursor(bool visible) {
     const auto color = ToColor(visible ? 0xffffff : 0);
-    const auto pos = Vector2D<int>{4 + 8 * cursor_.x, 5 + 16 * cursor_.y};
+    FillRectangle(*window_->Writer(), CalcCursorPos(), {7, 15}, color);
+}
 
-    FillRectangle(*window_->InnerWriter(), pos, {7, 15}, color);
+Vector2D<int> Terminal::CalcCursorPos() const {
+    return ToplevelWindow::kTopLeftMargin +
+           Vector2D<int>{4 + 8 * cursor_.x, 4 + 16 * cursor_.y};
+}
+
+Rectangle<int> Terminal::InputKey(uint8_t modifier, uint8_t keycode,
+                                  char ascii) {
+    DrawCursor(false);
+
+    Rectangle<int> draw_area{CalcCursorPos(), {8 * 2, 16}};
+
+    switch (ascii) {
+        case '\n':
+            linebuf_[linebuf_index_] = 0;
+            linebuf_index_ = 0;
+            cursor_.x = 0;
+            Log(kWarn, "line: %s\n", &linebuf_[0]);
+            if (cursor_.y < kRows - 1) {
+                cursor_.y++;
+            } else {
+                Scroll1();
+            }
+            draw_area.pos = ToplevelWindow::kTopLeftMargin;
+            draw_area.size = window_->InnerSize();
+            break;
+        case '\b':
+            if (cursor_.x > 0) {
+                cursor_.x--;
+                FillRectangle(*window_->Writer(), CalcCursorPos(), {8, 16},
+                              {0, 0, 0});
+                draw_area.pos = CalcCursorPos();
+
+                if (linebuf_index_ > 0) linebuf_index_--;
+            }
+            break;
+        default:
+            if (ascii == 0) break;
+            if (cursor_.x < kColumns - 1 && linebuf_index_ < kLineMax - 1) {
+                linebuf_[linebuf_index_++] = ascii;
+                WriteAscii(*window_->Writer(), CalcCursorPos(), ascii,
+                           {255, 255, 255});
+                cursor_.x++;
+            }
+    }
+
+    DrawCursor(true);
+    return draw_area;
+}
+
+void Terminal::Scroll1() {
+    Rectangle<int> move_src{
+        ToplevelWindow::kTopLeftMargin + Vector2D<int>{4, 4 + 16},
+        {8 * kColumns, 16 * (kRows - 1)}};
+    window_->Move(ToplevelWindow::kTopLeftMargin + Vector2D<int>{4, 4},
+                  move_src);
+    FillRectangle(*window_->InnerWriter(), {4, 4 + 16 * cursor_.y},
+                  {8 * kColumns, 16}, {0, 0, 0});
 }
 
 void TaskTerminal(uint64_t task_id, int64_t data) {
@@ -42,6 +100,7 @@ void TaskTerminal(uint64_t task_id, int64_t data) {
     Terminal *terminal = new Terminal;
     layer_manager->Move(terminal->LayerID(), {100, 200});
     active_layer->Activate(terminal->LayerID());
+    layer_task_map->insert(std::make_pair(terminal->LayerID(), task_id));
     __asm__("sti");
 
     for (;;) {
@@ -56,6 +115,17 @@ void TaskTerminal(uint64_t task_id, int64_t data) {
         switch (msg->type) {
             case Message::kTimerTimeout: {
                 const auto area = terminal->BlinkCursor();
+                Message msg = MakeLayerMessage(task_id, terminal->LayerID(),
+                                               LayerOperation::DrawArea, area);
+                __asm__("cli");
+                task_manager->SendMessage(1, msg);
+                __asm__("sti");
+                break;
+            }
+            case Message::kKeyPush: {
+                const auto area = terminal->InputKey(msg->arg.keyboard.modifier,
+                                                     msg->arg.keyboard.keycode,
+                                                     msg->arg.keyboard.ascii);
                 Message msg = MakeLayerMessage(task_id, terminal->LayerID(),
                                                LayerOperation::DrawArea, area);
                 __asm__("cli");
