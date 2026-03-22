@@ -6,6 +6,7 @@
 #include <memory>
 #include <utility>
 
+#include "fat.hpp"
 #include "font.hpp"
 #include "graphics.hpp"
 #include "layer.hpp"
@@ -137,6 +138,30 @@ void Terminal::ExecuteLine() {
                     dev.bus, dev.device, dev.function, vendor_id,
                     dev.header_type, dev.class_code.base, dev.class_code.sub,
                     dev.class_code.interface);
+            Print(s);
+        }
+        return;
+    }
+
+    if (strcmp(command, "ls") == 0) {
+        auto rood_dir_entries = fat::GetSectorByCluster<fat::DirectoryEntry>(
+            fat::boot_volume_image->root_cluster);
+        auto entries_per_cluster = fat::boot_volume_image->bytes_per_sector /
+                                   sizeof(fat::DirectoryEntry) *
+                                   fat::boot_volume_image->sectors_per_cluster;
+        char base[9], ext[4];
+        char s[64];
+        for (int i = 0; i < entries_per_cluster; i++) {
+            fat::ReadName(rood_dir_entries[i], base, ext);
+            if (base[0] == 0x00) return;
+            if (static_cast<uint8_t>(base[0]) == 0xe5) continue;
+            if (rood_dir_entries[i].attr == fat::Attribute::kLongName) continue;
+
+            if (ext[0]) {
+                sprintf(s, "%s.%s\n", base, ext);
+            } else {
+                sprintf(s, "%s\n", base);
+            }
             Print(s);
         }
         return;
