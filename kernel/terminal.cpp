@@ -1,5 +1,6 @@
 #include "terminal.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -146,9 +147,8 @@ void Terminal::ExecuteLine() {
     if (strcmp(command, "ls") == 0) {
         auto rood_dir_entries = fat::GetSectorByCluster<fat::DirectoryEntry>(
             fat::boot_volume_image->root_cluster);
-        auto entries_per_cluster = fat::boot_volume_image->bytes_per_sector /
-                                   sizeof(fat::DirectoryEntry) *
-                                   fat::boot_volume_image->sectors_per_cluster;
+        auto entries_per_cluster =
+            fat::bytes_per_cluster / sizeof(fat::DirectoryEntry);
         char base[9], ext[4];
         char s[64];
         for (int i = 0; i < entries_per_cluster; i++) {
@@ -167,14 +167,42 @@ void Terminal::ExecuteLine() {
         return;
     }
 
+    if (strcmp(command, "cat") == 0) {
+        auto file_entry = fat::FindFile(first_arg);
+        if (!file_entry) {
+            char s[64];
+            sprintf(s, "no such file: %s\n", first_arg);
+            Print(s);
+            return;
+        }
+
+        auto cluster = file_entry->FirstCluster();
+        auto remain_bytes = file_entry->file_size;
+
+        DrawCursor(false);
+        while (cluster != 0 && cluster != fat::kEndOfClusterchain) {
+            char *p = fat::GetSectorByCluster<char>(cluster);
+            const int bytes_to_read =
+                std::min<unsigned long>(fat::bytes_per_cluster, remain_bytes);
+
+            for (int i = 0; i < bytes_to_read; i++, p++) {
+                Print(*p);
+            }
+            remain_bytes -= bytes_to_read;
+
+            cluster = fat::NextCluster(cluster);
+        }
+        DrawCursor(true);
+
+        return;
+    }
+
     Print("no such command: ");
     Print(command);
     Print("\n");
 }
 
-void Terminal::Print(const char *s) {
-    DrawCursor(false);
-
+void Terminal::Print(char c) {
     auto newline = [this]() {
         cursor_.x = 0;
         if (cursor_.y < kRows - 1) {
@@ -184,21 +212,23 @@ void Terminal::Print(const char *s) {
         Scroll1();
     };
 
-    for (; *s; s++) {
-        if (*s == '\n') {
-            newline();
-            continue;
-        }
-
-        WriteAscii(*window_->Writer(), CalcCursorPos(), *s, {255, 255, 255});
-        if (cursor_.x == kColumns - 1) {
-            newline();
-            continue;
-        }
-
-        cursor_.x++;
+    if (c == '\n') {
+        newline();
+        return;
     }
 
+    WriteAscii(*window_->Writer(), CalcCursorPos(), c, {255, 255, 255});
+    if (cursor_.x == kColumns - 1) {
+        newline();
+        return;
+    }
+
+    cursor_.x++;
+}
+
+void Terminal::Print(const char *s) {
+    DrawCursor(false);
+    for (; *s; s++) Print(*s);
     DrawCursor(true);
 }
 

@@ -65,6 +65,7 @@ struct DirectoryEntry {
 } __attribute__((packed));
 
 extern BPB *boot_volume_image;
+extern unsigned long bytes_per_cluster;
 void Initialize(void *volume_image);
 
 /** 指定されたクラスタの先頭セクタが置いてあるメモリアドレスを返す
@@ -82,12 +83,30 @@ T *GetSectorByCluster(unsigned long cluster) {
     return reinterpret_cast<T *>(GetClusterAddr(cluster));
 }
 
-/** ディレクトリエントリの短名を基本名と拡張子名に分割して取得する。
- * パディングされた空白文字（0x20）は取り除かれ，ヌル終端される。
+/** ディレクトリエントリの短名を基本名と拡張子名に分割して取得する
+ * パディングされた空白文字 (0x20) は取り除かれ、ヌル終端される
  *
  * entry  ファイル名を得る対象のディレクトリエントリ
  * base   拡張子を除いたファイル名 (9 バイト以上の配列)
  * ext    拡張子 (4 バイト以上の配列)
  */
 void ReadName(const DirectoryEntry &entry, char *base, char *ext);
+
+static const unsigned long kEndOfClusterchain = 0x0ffffffflu;
+
+/** 指定されたクラスタの次のクラスタ番号を返す
+ *
+ * cluster  クラスタ番号
+ */
+unsigned long NextCluster(unsigned long cluster);
+
+/** 指定されたディレクトリからファイルを探す
+ *
+ * name               8+3形式のファイル名 (大文字小文字は区別しない)
+ * directory_cluster  ディレクトリの開始クラスタ
+ *                    (省略するとルートディレクトリから検索する)
+ */
+DirectoryEntry *FindFile(const char *name, unsigned long directory_cluster = 0);
+
+bool NameIsEqual(const DirectoryEntry &entry, const char *name);
 }  // namespace fat
