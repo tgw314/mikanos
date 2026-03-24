@@ -5,6 +5,7 @@
 #include <deque>
 #include <memory>
 
+#include "fat.hpp"
 #include "graphics.hpp"
 #include "window.hpp"
 
@@ -32,6 +33,7 @@ class Terminal {
     void Scroll1();
 
     void ExecuteLine();
+    void ExecuteFile(const fat::DirectoryEntry &file_entry);
     void Print(const char *s);
     void Print(char c);
 
