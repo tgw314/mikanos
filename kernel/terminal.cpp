@@ -24,6 +24,10 @@ std::vector<char *> MakeArgVector(char *command, char *first_arg) {
     std::vector<char *> argv;
     argv.push_back(command);
 
+    if (first_arg == nullptr) {
+        return argv;
+    }
+
     char *p = first_arg;
     for (;;) {
         while (isspace(*p)) p++;
@@ -36,6 +40,36 @@ std::vector<char *> MakeArgVector(char *command, char *first_arg) {
     }
 
     return argv;
+}
+
+void CalcLoadAddressRange(const Elf64_Ehdr *ehdr, uint64_t *first,
+                          uint64_t *last) {
+    auto phdr = reinterpret_cast<const Elf64_Phdr *>(
+        reinterpret_cast<uintptr_t>(ehdr) + ehdr->e_phoff);
+    *first = UINT64_MAX;
+    *last = 0;
+
+    for (Elf64_Half i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type != PT_LOAD) continue;
+
+        *first = std::min(*first, phdr[i].p_vaddr);
+        *last = std::max(*last, phdr[i].p_vaddr + phdr[i].p_memsz);
+    }
+}
+
+void CopyLoadSegments(const Elf64_Ehdr *ehdr, uint8_t *load_image,
+                      uint64_t image_base_vaddr) {
+    auto phdr = reinterpret_cast<const Elf64_Phdr *>(
+        reinterpret_cast<uintptr_t>(ehdr) + ehdr->e_phoff);
+    for (Elf64_Half i = 0; i < ehdr->e_phnum; i++) {
+        if (phdr[i].p_type != PT_LOAD) continue;
+
+        auto dst = load_image + (phdr[i].p_vaddr - image_base_vaddr);
+        auto src = reinterpret_cast<const uint8_t *>(
+            reinterpret_cast<uintptr_t>(ehdr) + phdr[i].p_offset);
+        memcpy(dst, src, phdr[i].p_filesz);
+        memset(dst + phdr[i].p_filesz, 0, phdr[i].p_memsz - phdr[i].p_filesz);
+    }
 }
 }  // namespace
 
@@ -249,7 +283,7 @@ void Terminal::ExecuteFile(const fat::DirectoryEntry &file_entry, char *command,
         cluster = fat::NextCluster(cluster);
     }
 
-    auto elf_header = reinterpret_cast<Elf64_Ehdr *>(&file_buf[0]);
+    auto elf_header = reinterpret_cast<const Elf64_Ehdr *>(&file_buf[0]);
     if (memcmp(elf_header->e_ident,
                "\x7f"
                "ELF",
@@ -260,10 +294,22 @@ void Terminal::ExecuteFile(const fat::DirectoryEntry &file_entry, char *command,
         return;
     }
 
+    uint64_t load_first_vaddr, load_last_vaddr;
+    CalcLoadAddressRange(elf_header, &load_first_vaddr, &load_last_vaddr);
+    if (load_first_vaddr >= load_last_vaddr ||
+        elf_header->e_entry < load_first_vaddr ||
+        load_last_vaddr <= elf_header->e_entry) {
+        Print("invalid elf entry\n");
+        return;
+    }
+
+    std::vector<uint8_t> load_image(load_last_vaddr - load_first_vaddr);
+    CopyLoadSegments(elf_header, &load_image[0], load_first_vaddr);
+
     auto argv = MakeArgVector(command, first_arg);
 
-    auto entry_addr = elf_header->e_entry;
-    entry_addr += reinterpret_cast<uintptr_t>(&file_buf[0]);
+    auto entry_addr = reinterpret_cast<uintptr_t>(&load_image[0]);
+    entry_addr += elf_header->e_entry - load_first_vaddr;
     using Func = int(int, char **);
     auto f = reinterpret_cast<Func *>(entry_addr);
     auto ret = f(argv.size(), &argv[0]);
