@@ -1,6 +1,7 @@
 #include "terminal.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -8,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "elf.hpp"
 #include "fat.hpp"
 #include "font.hpp"
 #include "graphics.hpp"
@@ -16,6 +18,26 @@
 #include "pci.hpp"
 #include "task.hpp"
 #include "window.hpp"
+
+namespace {
+std::vector<char *> MakeArgVector(char *command, char *first_arg) {
+    std::vector<char *> argv;
+    argv.push_back(command);
+
+    char *p = first_arg;
+    for (;;) {
+        while (isspace(*p)) p++;
+        if (*p == '\0') break;
+        argv.push_back(p);
+
+        while (*p != '\0' && !isspace(*p)) p++;
+        if (*p == '\0') break;
+        *p++ = '\0';
+    }
+
+    return argv;
+}
+}  // namespace
 
 Terminal::Terminal() {
     window_ = std::make_shared<ToplevelWindow>(
@@ -146,17 +168,17 @@ void Terminal::ExecuteLine() {
     }
 
     if (strcmp(command, "ls") == 0) {
-        auto rood_dir_entries = fat::GetSectorByCluster<fat::DirectoryEntry>(
+        auto root_dir_entries = fat::GetSectorByCluster<fat::DirectoryEntry>(
             fat::boot_volume_image->root_cluster);
         auto entries_per_cluster =
             fat::bytes_per_cluster / sizeof(fat::DirectoryEntry);
         char base[9], ext[4];
         char s[64];
         for (int i = 0; i < entries_per_cluster; i++) {
-            fat::ReadName(rood_dir_entries[i], base, ext);
+            fat::ReadName(root_dir_entries[i], base, ext);
             if (base[0] == 0x00) return;
             if (static_cast<uint8_t>(base[0]) == 0xe5) continue;
-            if (rood_dir_entries[i].attr == fat::Attribute::kLongName) continue;
+            if (root_dir_entries[i].attr == fat::Attribute::kLongName) continue;
 
             if (ext[0]) {
                 sprintf(s, "%s.%s\n", base, ext);
@@ -200,7 +222,7 @@ void Terminal::ExecuteLine() {
 
     auto file_entry = fat::FindFile(command);
     if (file_entry) {
-        ExecuteFile(*file_entry);
+        ExecuteFile(*file_entry, command, first_arg);
         return;
     }
 
@@ -209,7 +231,8 @@ void Terminal::ExecuteLine() {
     Print("\n");
 }
 
-void Terminal::ExecuteFile(const fat::DirectoryEntry &file_entry) {
+void Terminal::ExecuteFile(const fat::DirectoryEntry &file_entry, char *command,
+                           char *first_arg) {
     auto cluster = file_entry.FirstCluster();
     auto remain_bytes = file_entry.file_size;
 
@@ -226,9 +249,28 @@ void Terminal::ExecuteFile(const fat::DirectoryEntry &file_entry) {
         cluster = fat::NextCluster(cluster);
     }
 
-    using Func = void();
-    auto f = reinterpret_cast<Func *>(&file_buf[0]);
-    f();
+    auto elf_header = reinterpret_cast<Elf64_Ehdr *>(&file_buf[0]);
+    if (memcmp(elf_header->e_ident,
+               "\x7f"
+               "ELF",
+               4) != 0) {
+        using Func = void();
+        auto f = reinterpret_cast<Func *>(&file_buf[0]);
+        f();
+        return;
+    }
+
+    auto argv = MakeArgVector(command, first_arg);
+
+    auto entry_addr = elf_header->e_entry;
+    entry_addr += reinterpret_cast<uintptr_t>(&file_buf[0]);
+    using Func = int(int, char **);
+    auto f = reinterpret_cast<Func *>(entry_addr);
+    auto ret = f(argv.size(), &argv[0]);
+
+    char s[64];
+    sprintf(s, "app exited. ret = %d\n", ret);
+    Print(s);
 }
 
 void Terminal::Print(char c) {
