@@ -17,7 +17,7 @@ LDFLAGS  += -L../../../osbook/devenv/x86_64-elf/lib \
 all: $(TARGET)
 
 rpn: rpn.o Makefile
-	ld.mold $(LDFLAGS) -o rpn rpn.o
+	ld.mold $(LDFLAGS) -o rpn rpn.o -lc -lc++ -lc++abi
 
 %.o: %.cpp Makefile
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
