@@ -54,11 +54,17 @@ Elf64_Phdr *GetProgramHeader(Elf64_Ehdr *ehdr) {
 
 uintptr_t GetFirstLoadAddress(Elf64_Ehdr *ehdr) {
     auto phdr = GetProgramHeader(ehdr);
+    uintptr_t first = UINT64_MAX;
     for (int i = 0; i < ehdr->e_phnum; i++) {
         if (phdr[i].p_type != PT_LOAD) continue;
-        return phdr[i].p_vaddr;
+
+        first = std::min(first, static_cast<uintptr_t>(phdr[i].p_vaddr));
     }
-    return 0;
+
+    if (first == UINT64_MAX) {
+        return 0;
+    }
+    return first;
 }
 
 static_assert(kBytesPerFrame >= 4096);
@@ -134,7 +140,8 @@ Error CopyLoadSegments(Elf64_Ehdr *ehdr) {
 
         LinearAddress4Level dest_addr;
         dest_addr.value = phdr[i].p_vaddr;
-        const auto num_4kpages = (phdr[i].p_memsz + 4095) / 4096;
+        const auto page_offset = phdr[i].p_vaddr & 0xfffu;
+        const auto num_4kpages = (page_offset + phdr[i].p_memsz + 4095) / 4096;
 
         if (auto err = SetupPageMaps(dest_addr, num_4kpages)) {
             return err;
