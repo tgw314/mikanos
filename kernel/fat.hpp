@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 namespace fat {
 struct BPB {
@@ -109,4 +110,13 @@ unsigned long NextCluster(unsigned long cluster);
 DirectoryEntry *FindFile(const char *name, unsigned long directory_cluster = 0);
 
 bool NameIsEqual(const DirectoryEntry &entry, const char *name);
+
+/** 指定されたファイルの内容をバッファへコピーする
+ *  読み込んだバイト数を返す
+ *
+ * buf    ファイル内容の格納先
+ * len    バッファの大きさ (バイト単位)
+ * entry  ファイルを表すディレクトリエントリ
+ */
+size_t LoadFile(void *buf, size_t len, const DirectoryEntry &entry);
 }  // namespace fat
