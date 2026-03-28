@@ -7,7 +7,6 @@
 #include "message.hpp"
 #include "segment.hpp"
 #include "task.hpp"
-#include "timer.hpp"
 #include "x86_descriptor.hpp"
 
 std::array<InterruptDescriptor, 256> idt;
@@ -30,10 +29,6 @@ namespace {
 __attribute__((interrupt)) void IntHandlerXHCI(InterruptFrame *frame) {
     task_manager->SendMessage(1, Message{Message::kInterruptXHCI});
     NotifyEndOfInterrupt();
-}
-
-__attribute__((interrupt)) void IntHandlerLAPICTimer(InterruptFrame *frame) {
-    LAPICTimerOnInterrupt();
 }
 }  // namespace
 
