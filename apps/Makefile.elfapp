@@ -14,8 +14,11 @@ LDFLAGS  += -L../../../osbook/devenv/x86_64-elf/lib \
 .PHONY: all
 all: $(TARGET)
 
-$(TARGET): $(TARGET).o Makefile ../Makefile.elfapp
-	ld.mold $(LDFLAGS) -o $@ $< -lc -lc++ -lc++abi
+$(TARGET): $(OBJS) Makefile ../Makefile.elfapp
+	ld.mold $(LDFLAGS) -o $@ $(OBJS) -lc -lc++ -lc++abi
 
 %.o: %.cpp Makefile ../Makefile.elfapp
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+%.o: %.asm Makefile ../Makefile.elfapp
+	nasm -f elf64 -o $@ $<

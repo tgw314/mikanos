@@ -21,6 +21,7 @@
 #include "paging.hpp"
 #include "pci.hpp"
 #include "segment.hpp"
+#include "syscall.hpp"
 #include "task.hpp"
 #include "terminal.hpp"
 #include "timer.hpp"
@@ -141,6 +142,8 @@ extern "C" void KernelMainNewStack(
     const int kTimer500Ms = static_cast<int>(kTimerFreq * 0.5);
     timer_manager->AddTimer(Timer{kTimer500Ms, kTextboxCursorTimer});
     bool textbox_cursor_visible = false;
+
+    InitializeSyscall();
 
     InitializeTask();
     Task &main_task = task_manager->CurrentTask();
