@@ -17,6 +17,9 @@ all: $(TARGET)
 $(TARGET): $(OBJS) Makefile ../Makefile.elfapp
 	ld.mold $(LDFLAGS) -o $@ $(OBJS) -lc -lc++ -lc++abi
 
+%.o: %.c Makefile ../Makefile.elfapp
+	clang $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
 %.o: %.cpp Makefile ../Makefile.elfapp
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
