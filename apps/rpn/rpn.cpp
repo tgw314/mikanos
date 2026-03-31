@@ -9,7 +9,9 @@ long Pop() { return stack[stack_ptr--]; }
 
 void Push(long value) { stack[++stack_ptr] = value; }
 
-extern "C" int main(int argc, char **argv) {
+extern "C" void SyscallExit(int exit_code);
+
+extern "C" void main(int argc, char **argv) {
     stack_ptr = -1;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "+") == 0) {
@@ -35,5 +37,5 @@ extern "C" int main(int argc, char **argv) {
     }
 
     printf("%ld\n", result);
-    for (;;);
+    SyscallExit(static_cast<int>(result));
 }

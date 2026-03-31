@@ -50,6 +50,8 @@ Task &Task::InitContext(TaskFunc *f, int64_t data) {
 
 TaskContext &Task::Context() { return context_; }
 
+uint64_t &Task::OSStackPointer() { return os_stack_ptr_; }
+
 uint64_t Task::ID() const { return id_; }
 
 Task &Task::Sleep() {
