@@ -2,14 +2,14 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "../syscall.h"
+
 int stack_ptr;
 long stack[100];
 
 long Pop() { return stack[stack_ptr--]; }
 
 void Push(long value) { stack[++stack_ptr] = value; }
-
-extern "C" void SyscallExit(int exit_code);
 
 extern "C" void main(int argc, char **argv) {
     stack_ptr = -1;
