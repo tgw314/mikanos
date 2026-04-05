@@ -14,6 +14,7 @@
 #include "msr.hpp"
 #include "task.hpp"
 #include "terminal.hpp"
+#include "timer.hpp"
 #include "window.hpp"
 
 namespace syscall {
@@ -121,18 +122,21 @@ SYSCALL(WinFillRectangle) {
         arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+SYSCALL(GetCurrentTick) { return {timer_manager->CurrentTick(), kTimerFreq}; }
+
 #undef SYSCALL
 }  // namespace syscall
 
 using SyscallFuncType = syscall::Result(uint64_t, uint64_t, uint64_t, uint64_t,
                                         uint64_t, uint64_t);
-extern "C" std::array<SyscallFuncType *, 6> syscall_table{
+extern "C" std::array<SyscallFuncType *, 7> syscall_table{
     /* 0x00 */ syscall::LogString,
     /* 0x01 */ syscall::PutString,
     /* 0x02 */ syscall::Exit,
     /* 0x03 */ syscall::OpenWindow,
     /* 0x04 */ syscall::WinWriteString,
     /* 0x05 */ syscall::WinFillRectangle,
+    /* 0x06 */ syscall::GetCurrentTick,
 };
 
 void InitializeSyscall() {
