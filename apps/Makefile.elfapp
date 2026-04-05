@@ -17,7 +17,7 @@ OBJS += ../syscall.o ../newlib_support.o
 all: $(TARGET)
 
 $(TARGET): $(OBJS) Makefile ../Makefile.elfapp
-	ld.mold $(LDFLAGS) -o $@ $(OBJS) -lc -lc++ -lc++abi
+	ld.mold $(LDFLAGS) -o $@ $(OBJS) -lc -lc++ -lc++abi -lm
 
 %.o: %.c Makefile ../Makefile.elfapp
 	clang $(CPPFLAGS) $(CFLAGS) -c $< -o $@

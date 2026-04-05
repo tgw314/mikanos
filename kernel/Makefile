@@ -30,7 +30,7 @@ clean:
 	rm -rf *.o
 
 kernel.elf: $(OBJS) Makefile
-	ld.mold $(LDFLAGS) -o kernel.elf $(OBJS) -lc -lc++ -lc++abi
+	ld.mold $(LDFLAGS) -o kernel.elf $(OBJS) -lc -lc++ -lc++abi -lm
 
 %.o: %.cpp Makefile
 	clang++ $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
