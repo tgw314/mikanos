@@ -8,6 +8,7 @@ extern "C" {
 #include <stdint.h>
 #endif
 
+#include "../kernel/app_event.hpp"
 #include "../kernel/logger.hpp"
 
 struct SyscallResult {
@@ -33,6 +34,7 @@ struct SyscallResult SyscallWinRedraw(uint64_t layer_id_flags);
 struct SyscallResult SyscallWinDrawLine(uint64_t layer_id_flags, int x0, int y0,
                                         int x1, int y1, uint32_t color);
 struct SyscallResult SyscallCloseWindow(uint64_t layer_id_flags);
+struct SyscallResult SyscallReadEvent(struct AppEvent *events, size_t len);
 #ifdef __cplusplus
 }
 #endif

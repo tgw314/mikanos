@@ -1,5 +1,8 @@
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
+#include "../../kernel/app_event.hpp"
 #include "../syscall.h"
 
 extern "C" void main(int argc, char **argv) {
@@ -12,6 +15,20 @@ extern "C" void main(int argc, char **argv) {
     SyscallWinWriteString(layer_id, 7, 24, 0xc00000, "hello world!");
     SyscallWinWriteString(layer_id, 24, 40, 0x00c000, "hello world!");
     SyscallWinWriteString(layer_id, 40, 56, 0x0000c0, "hello world!");
+
+    AppEvent events[1];
+    for (;;) {
+        auto [n, err] = SyscallReadEvent(events, 1);
+        if (err) {
+            printf("ReadEvent failed: %s\n", strerror(err));
+            break;
+        }
+        if (events[0].type == AppEvent::kQuit) {
+            break;
+        }
+
+        printf("unknown event: type = %d\n", events[0].type);
+    }
 
     SyscallCloseWindow(layer_id);
     exit(0);
