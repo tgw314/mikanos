@@ -244,7 +244,8 @@ SYSCALL(ReadEvent) {
                                        .y = msg->arg.mouse_move.y,
                                        .dx = msg->arg.mouse_move.dx,
                                        .dy = msg->arg.mouse_move.dy,
-                                       .buttons = msg->arg.mouse_move.buttons}};
+                                       .buttons = msg->arg.mouse_move.buttons},
+                };
                 break;
             default:
                 Log(kInfo, "uncaught event type: %u\n", msg->type);

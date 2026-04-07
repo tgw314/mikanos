@@ -55,11 +55,13 @@ void SendMouseMessage(Vector2D<int> newpos, Vector2D<int> posdiff,
     if (posdiff.x != 0 || posdiff.y != 0) {
         const auto relpos = newpos - layer->GetPosition();
         Message msg{Message::kMouseMove};
-        msg.arg.mouse_move = {.x = relpos.x,
-                              .y = relpos.y,
-                              .dx = posdiff.x,
-                              .dy = posdiff.y,
-                              .buttons = buttons};
+        msg.arg.mouse_move = {
+            .x = relpos.x,
+            .y = relpos.y,
+            .dx = posdiff.x,
+            .dy = posdiff.y,
+            .buttons = buttons,
+        };
         task_manager->SendMessage(task_it->second, msg);
     }
 }
