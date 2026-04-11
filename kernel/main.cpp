@@ -203,7 +203,9 @@ extern "C" void KernelMainNewStack(
                 auto act = active_layer->GetActive();
                 auto arg = msg->arg.keyboard;
                 if (act == text_window_layer_id) {
-                    InputTextWindow(arg.ascii);
+                    if (msg->arg.keyboard.press) {
+                        InputTextWindow(arg.ascii);
+                    }
                     break;
                 }
 

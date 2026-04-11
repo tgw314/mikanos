@@ -235,7 +235,16 @@ SYSCALL(ReadEvent) {
                     msg->arg.keyboard.modifier &
                         (kLControlBitMask | kRControlBitMask)) {
                     app_events[i++].type = AppEvent::kQuit;
+                    break;
                 }
+
+                app_events[i++] = {
+                    .type = AppEvent::kKeyPush,
+                    .arg.keypush = {.modifier = msg->arg.keyboard.modifier,
+                                    .keycode = msg->arg.keyboard.keycode,
+                                    .ascii = msg->arg.keyboard.ascii,
+                                    .press = msg->arg.keyboard.press},
+                };
                 break;
             case Message::kMouseMove:
                 app_events[i++] = {
