@@ -203,10 +203,16 @@ extern "C" void KernelMainNewStack(
                 auto act = active_layer->GetActive();
                 auto arg = msg->arg.keyboard;
                 if (act == text_window_layer_id) {
-                    if (msg->arg.keyboard.press) {
+                    if (arg.press) {
                         InputTextWindow(arg.ascii);
                     }
                     break;
+                }
+
+                if (arg.press && arg.keycode == 59 /* F2 */) {
+                    task_manager->NewTask()
+                        .InitContext(TaskTerminal, 0)
+                        .Wakeup();
                 }
 
                 __asm__("cli");
