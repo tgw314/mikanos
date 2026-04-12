@@ -197,7 +197,7 @@ extern "C" void KernelMainNewStack(
                 break;
             case Message::kKeyPush: {
                 auto act = active_layer->GetActive();
-                auto arg = msg->arg.keyboard;
+                const auto &arg = msg->arg.keyboard;
                 if (act == text_window_layer_id) {
                     if (arg.press) {
                         InputTextWindow(arg.ascii);
