@@ -1,6 +1,7 @@
 #include "interrupt.hpp"
 
 #include <array>
+#include <csignal>
 #include <cstdint>
 
 #include "asmfunc.h"
@@ -59,9 +60,19 @@ void PrintFrame(InterruptFrame *frame, const char *exp_name) {
     PrintHex(frame->rsp, 16, {500 + 8 * 12, 16 * 3});
 }
 
+void KillApp(InterruptFrame *frame) {
+    const auto cpl = frame->cs & 0x3;
+    if (cpl != 3) return;
+
+    auto &task = task_manager->CurrentTask();
+    __asm__("sti");
+    ExitApp(task.OSStackPointer(), 128 + SIGSEGV);
+}
+
 #define FaultHandlerWithError(fault_name)                             \
     __attribute__((interrupt)) void IntHandler##fault_name(           \
         InterruptFrame *frame, uint64_t error_code) {                 \
+        KillApp(frame);                                               \
         PrintFrame(frame, "#" #fault_name);                           \
         WriteString(*screen_writer, {500, 16 * 4}, "ERR", {0, 0, 0}); \
         PrintHex(error_code, 16, {500 + 8 * 4, 16 * 4});              \
@@ -71,6 +82,7 @@ void PrintFrame(InterruptFrame *frame, const char *exp_name) {
 #define FaultHandlerNoError(fault_name)                     \
     __attribute__((interrupt)) void IntHandler##fault_name( \
         InterruptFrame *frame) {                            \
+        KillApp(frame);                                     \
         PrintFrame(frame, "#" #fault_name);                 \
         for (;;) __asm__("hlt");                            \
     }

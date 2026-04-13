@@ -30,6 +30,7 @@ class Error {
         kNoSuchTask,
         kInvalidFormat,
         kFrameTooSmall,
+        kInvalidFile,
         kLastOfCode,
     };
 
@@ -59,6 +60,7 @@ class Error {
         "kUnknownPixelFormat",
         "kNoSuchTask",
         "kInvalidFormat",
+        "kInvalidFile",
         "kFrameTooSmall",
     };
     static_assert(kLastOfCode == code_names_.size());
