@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 namespace fat {
 struct BPB {
     uint8_t jump_boot[3];
@@ -93,6 +94,14 @@ T *GetSectorByCluster(unsigned long cluster) {
  */
 void ReadName(const DirectoryEntry &entry, char *base, char *ext);
 
+/** ディレクトリエントリの短名を dest にコピーする
+ * 短名の拡張子が空なら "<base>" を、空でなければ "<base>.<ext>" をコピー
+ *
+ * entry  ファイル名を得る対象のディレクトリエントリ
+ * dest   基本名と拡張子を結合した文字列を格納するに十分な大きさの配列
+ */
+void FormatName(const DirectoryEntry &entry, char *dest);
+
 static const unsigned long kEndOfClusterchain = 0x0ffffffflu;
 
 /** 指定されたクラスタの次のクラスタ番号を返す
@@ -103,11 +112,19 @@ unsigned long NextCluster(unsigned long cluster);
 
 /** 指定されたディレクトリからファイルを探す
  *
+ * ファイルまたはディレクトリを表すエントリと、
+ * 末尾スラッシュを示すフラグの組を返す
+ *   ファイルまたはディレクトリが見つからなければ nullptr
+ *   エントリの直後にスラッシュがあれば true
+ *   パスの途中のエントリがファイルであれば探索を諦め、そのエントリと true
+ * を返す
+ *
  * name               8+3形式のファイル名 (大文字小文字は区別しない)
  * directory_cluster  ディレクトリの開始クラスタ
  *                    (省略するとルートディレクトリから検索する)
  */
-DirectoryEntry *FindFile(const char *name, unsigned long directory_cluster = 0);
+std::pair<DirectoryEntry *, bool> FindFile(const char *path,
+                                           unsigned long directory_cluster = 0);
 
 bool NameIsEqual(const DirectoryEntry &entry, const char *name);
 

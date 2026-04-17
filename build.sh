@@ -23,7 +23,7 @@ run_mikanos() {
     LOADER_EFI=${LOADER_EFI:-"$MIKANOS_DIR/../edk2/Build/MikanLoaderX64/DEBUG_CLANG38/X64/Loader.efi"}
     DEVENV_DIR="$MIKANOS_DIR/../osbook/devenv"
     DISK_IMG=${DISK_IMG:-"$MIKANOS_DIR/disk.img"}
-    APPS_DIR=${APPS_DIR:-}
+    APPS_DIR=${APPS_DIR:-"apps"}
     RESOURCE_DIR=${RESOURCE_DIR:-}
     QEMU_OPTS=${QEMU_OPTS:-}
 
