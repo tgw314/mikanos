@@ -4,10 +4,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
+#include <vector>
 
 #include "asmfunc.h"
 #include "error.hpp"
+#include "fat.hpp"
 #include "message.hpp"
 #include "segment.hpp"
 #include "timer.hpp"
@@ -75,6 +78,10 @@ std::optional<Message> Task::ReceiveMessage() {
     auto m = msgs_.front();
     msgs_.pop_front();
     return m;
+}
+
+std::vector<std::unique_ptr<fat::FileDescriptor>> &Task::Files() {
+    return files_;
 }
 
 TaskManager::TaskManager() {

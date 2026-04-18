@@ -425,7 +425,7 @@ void Terminal::ExecuteLine() {
     }
 
     if (strcmp(command, "ls") == 0) {
-        if (first_arg[0] == '\0') {
+        if (!first_arg || first_arg[0] == '\0') {
             ListAllEntries(this, fat::boot_volume_image->root_cluster);
             return;
         }
@@ -504,15 +504,14 @@ void Terminal::ExecuteLine() {
             Print("failed to exec file: ");
             Print(err.Name());
             Print("\n");
-            return;
-        }
-        if (file_entry->attr != fat::Attribute::kDirectory && post_slash) {
+        } else if (file_entry->attr != fat::Attribute::kDirectory &&
+                   post_slash) {
             char name[13];
             fat::FormatName(*file_entry, name);
             Print(name);
             Print(" is not a directory\n");
-            return;
         }
+        return;
     }
 
     Print("no such command: ");
