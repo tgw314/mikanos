@@ -1,19 +1,18 @@
 #include "syscall.hpp"
 
-#include <fcntl.h>
+#include <sys/_default_fcntl.h>
 
 #include <array>
 #include <cerrno>
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <utility>
 
 #include "app_event.hpp"
 #include "asmfunc.h"
+#include "error.hpp"
 #include "fat.hpp"
 #include "font.hpp"
 #include "graphics.hpp"
@@ -319,6 +318,20 @@ size_t AllocateFD(Task &task) {
     task.Files().emplace_back();
     return num_files;
 }
+
+std::pair<fat::DirectoryEntry *, int> CreateFile(const char *path) {
+    auto [file, err] = fat::CreateFile(path);
+    switch (err.Cause()) {
+        case Error::kIsDirectory:
+            return {file, EISDIR};
+        case Error::kNoSuchEntry:
+            return {file, ENOENT};
+        case Error::kNoEnoughMemory:
+            return {file, ENOSPC};
+        default:
+            return {file, 0};
+    }
+}
 }  // namespace
 
 SYSCALL(OpenFile) {
@@ -332,20 +345,22 @@ SYSCALL(OpenFile) {
         return {0, 0};
     }
 
-    if ((flags & O_ACCMODE) == O_WRONLY) {
-        return {0, EINVAL};
-    }
-
-    auto [dir, post_slash] = fat::FindFile(path);
-    if (dir == nullptr) {
-        return {0, ENOENT};
-    }
-    if (dir->attr != fat::Attribute::kDirectory && post_slash) {
+    auto [file, post_slash] = fat::FindFile(path);
+    if (file == nullptr) {
+        if ((flags & O_CREAT) == 0) {
+            return {0, ENOENT};
+        }
+        auto [new_file, err] = CreateFile(path);
+        if (err) {
+            return {0, err};
+        }
+        file = new_file;
+    } else if (file->attr != fat::Attribute::kDirectory && post_slash) {
         return {0, ENOENT};
     }
 
     size_t fd = AllocateFD(task);
-    task.Files()[fd] = std::make_unique<fat::FileDescriptor>(*dir);
+    task.Files()[fd] = std::make_unique<fat::FileDescriptor>(*file);
     return {fd, 0};
 }
 

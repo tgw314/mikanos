@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "error.hpp"
 #include "file.hpp"
 
 namespace fat {
@@ -139,6 +140,39 @@ bool NameIsEqual(const DirectoryEntry &entry, const char *name);
  * entry  ファイルを表すディレクトリエントリ
  */
 size_t LoadFile(void *buf, size_t len, const DirectoryEntry &entry);
+
+bool IsEndOfClusterchain(unsigned long cluster);
+
+uint32_t *GetFAT();
+
+/** 指定したクラスタ数だけクラスタチェーンを伸長する
+ * 伸長後のチェーンにおける最後尾のクラスタ番号を返す
+ *
+ * eoc_cluster  伸長したいクラスタチェーンに属するいずれかのクラスタ番号
+ * n            伸長するクラスタ数
+ */
+unsigned long ExtendCluster(unsigned long eoc_cluster, size_t n);
+
+/** 指定したディレクトリの空きエントリを 1 つ返す
+ * ディレクトリが満杯ならクラスタを 1 つ伸長して空きエントリを確保する
+ *
+ * dir_cluster  空きエントリを探すディレクトリ
+ */
+DirectoryEntry *AllocateEntry(unsigned long dir_cluster);
+
+/** ディレクトリエントリに短ファイル名をセットする。
+ *
+ * entry  ファイル名を設定する対象のディレクトリエントリ
+ * name   基本名と拡張子をドットで結合したファイル名
+ */
+void SetFileName(DirectoryEntry &entry, const char *name);
+
+/** 指定されたパスにファイルエントリを作成する
+ * 新規作成されたファイルエントリを返す
+ *
+ * path  ファイルパス
+ */
+WithError<DirectoryEntry *> CreateFile(const char *path);
 
 class FileDescriptor : public ::FileDescriptor {
    public:

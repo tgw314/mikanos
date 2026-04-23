@@ -31,6 +31,8 @@ class Error {
         kInvalidFormat,
         kFrameTooSmall,
         kInvalidFile,
+        kIsDirectory,
+        kNoSuchEntry,
         kLastOfCode,
     };
 
@@ -61,6 +63,8 @@ class Error {
         "kNoSuchTask",
         "kInvalidFormat",
         "kInvalidFile",
+        "kIsDirectory",
+        "kNoSuchEntry",
         "kFrameTooSmall",
     };
     static_assert(kLastOfCode == code_names_.size());
