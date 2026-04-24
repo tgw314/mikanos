@@ -106,7 +106,7 @@ void ReadName(const DirectoryEntry &entry, char *base, char *ext);
  */
 void FormatName(const DirectoryEntry &entry, char *dest);
 
-static const unsigned long kEndOfClusterchain = 0x0ffffffflu;
+static const unsigned long kEndOfClusterChain = 0x0ffffffflu;
 
 /** 指定されたクラスタの次のクラスタ番号を返す
  *
@@ -141,7 +141,7 @@ bool NameIsEqual(const DirectoryEntry &entry, const char *name);
  */
 size_t LoadFile(void *buf, size_t len, const DirectoryEntry &entry);
 
-bool IsEndOfClusterchain(unsigned long cluster);
+bool IsEndOfClusterChain(unsigned long cluster);
 
 uint32_t *GetFAT();
 
@@ -174,15 +174,26 @@ void SetFileName(DirectoryEntry &entry, const char *name);
  */
 WithError<DirectoryEntry *> CreateFile(const char *path);
 
+/** 指定した数の空きクラスタからなるチェーンを構築する
+ * 構築したチェーンの先頭クラスタ番号を返す
+ *
+ * n  クラスタ数
+ */
+unsigned long AllocateClusterChain(size_t n);
+
 class FileDescriptor : public ::FileDescriptor {
    public:
     explicit FileDescriptor(DirectoryEntry &fat_entry);
     size_t Read(void *buf, size_t len) override;
+    size_t Write(const void *buf, size_t len) override;
 
    private:
     DirectoryEntry &fat_entry_;
     size_t rd_off_ = 0;
     unsigned long rd_cluster_ = 0;
     size_t rd_cluster_off_ = 0;
+    size_t wr_off_ = 0;
+    unsigned long wr_cluster_ = 0;
+    size_t wr_cluster_off_ = 0;
 };
 }  // namespace fat
