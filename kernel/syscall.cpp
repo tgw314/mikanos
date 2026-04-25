@@ -5,6 +5,7 @@
 #include <array>
 #include <cerrno>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -379,12 +380,24 @@ SYSCALL(ReadFile) {
     return {task.Files()[fd]->Read(buf, count), 0};
 }
 
+SYSCALL(DemandPages) {
+    const size_t num_pages = arg1;
+    // const int flags = arg2;
+    __asm__("cli");
+    auto &task = task_manager->CurrentTask();
+    __asm__("sti");
+
+    const uint64_t dp_end = task.DPagingEnd();
+    task.SetDPagingEnd(dp_end + 4096 * num_pages);
+    return {dp_end, 0};
+}
+
 #undef SYSCALL
 }  // namespace syscall
 
 using SyscallFuncType = syscall::Result(uint64_t, uint64_t, uint64_t, uint64_t,
                                         uint64_t, uint64_t);
-extern "C" std::array<SyscallFuncType *, 0xe> syscall_table{
+extern "C" std::array<SyscallFuncType *, 0xf> syscall_table{
     /* 0x00 */ syscall::LogString,
     /* 0x01 */ syscall::PutString,
     /* 0x02 */ syscall::Exit,
@@ -399,6 +412,7 @@ extern "C" std::array<SyscallFuncType *, 0xe> syscall_table{
     /* 0x0b */ syscall::CreateTimer,
     /* 0x0c */ syscall::OpenFile,
     /* 0x0d */ syscall::ReadFile,
+    /* 0x0e */ syscall::DemandPages,
 };
 
 void InitializeSyscall() {
