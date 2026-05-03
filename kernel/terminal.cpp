@@ -110,7 +110,8 @@ WithError<uint64_t> CopyLoadSegments(Elf64_Ehdr *ehdr) {
         const auto page_offset = phdr[i].p_vaddr & 0xfffu;
         const auto num_4kpages = (page_offset + phdr[i].p_memsz + 4095) / 4096;
 
-        if (auto err = SetupPageMaps(dest_addr, num_4kpages)) {
+        // setup pagemaps as readonly (writable = false)
+        if (auto err = SetupPageMaps(dest_addr, num_4kpages, false)) {
             return {last_addr, err};
         }
 
@@ -178,7 +179,48 @@ void ListAllEntries(Terminal *term, uint32_t dir_cluster) {
         dir_cluster = fat::NextCluster(dir_cluster);
     }
 }
+
+WithError<AppLoadInfo> LoadApp(fat::DirectoryEntry &file_entry, Task &task) {
+    auto res = SetupPML4(task);
+    if (res.error) return {{}, res.error};
+    PageMapEntry *pml4 = res.value;
+
+    if (auto it = app_loads->find(&file_entry); it != app_loads->end()) {
+        AppLoadInfo app_load = it->second;
+        auto err = CopyPageMaps(pml4, app_load.pml4, 4, 256);
+        app_load.pml4 = pml4;
+        return {app_load, err};
+    }
+
+    std::vector<uint8_t> file_buf(file_entry.file_size);
+    fat::LoadFile(&file_buf[0], file_buf.size(), file_entry);
+
+    auto elf_header = reinterpret_cast<Elf64_Ehdr *>(&file_buf[0]);
+    if (memcmp(elf_header->e_ident,
+               "\x7f"
+               "ELF",
+               4) != 0) {
+        return {{}, MAKE_ERROR(Error::kInvalidFile)};
+    }
+
+    auto [last_addr, err_load] = LoadELF(elf_header);
+    if (err_load) {
+        return {{}, err_load};
+    }
+
+    AppLoadInfo app_load{last_addr, elf_header->e_entry, pml4};
+    app_loads->insert(std::make_pair(&file_entry, app_load));
+
+    res = SetupPML4(task);
+    if (res.error) return {app_load, res.error};
+    app_load.pml4 = res.value;
+
+    auto err = CopyPageMaps(app_load.pml4, pml4, 4, 256);
+    return {app_load, err};
+}
 }  // namespace
+
+std::map<fat::DirectoryEntry *, AppLoadInfo> *app_loads;
 
 Terminal::Terminal(uint64_t task_id, bool show_window)
     : task_id_{task_id}, show_window_{show_window} {
@@ -432,29 +474,12 @@ void Terminal::ExecuteLine() {
 
 Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
                             char *first_arg) {
-    std::vector<uint8_t> file_buf(file_entry.file_size);
-    fat::LoadFile(&file_buf[0], file_buf.size(), file_entry);
-
-    auto elf_header = reinterpret_cast<Elf64_Ehdr *>(&file_buf[0]);
-    if (memcmp(elf_header->e_ident,
-               "\x7f"
-               "ELF",
-               4) != 0) {
-        return MAKE_ERROR(Error::kInvalidFile);
-    }
-
     __asm__("cli");
     auto &task = task_manager->CurrentTask();
     __asm__("sti");
 
-    if (auto pml4 = SetupPML4(task); pml4.error) {
-        return pml4.error;
-    }
-
-    const auto [elf_last_addr, elf_err] = LoadELF(elf_header);
-    if (elf_err) {
-        return elf_err;
-    }
+    auto [app_load, err] = LoadApp(file_entry, task);
+    if (err) return err;
 
     LinearAddress4Level args_frame_addr{0xffff'ffff'ffff'f000};
     if (auto err = SetupPageMaps(args_frame_addr, 1)) {
@@ -482,15 +507,14 @@ Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
     }
 
     const uint64_t elf_next_page =
-        (elf_last_addr + 4095) & 0xffff'ffff'ffff'f000;
+        (app_load.vaddr_end + 4095) & 0xffff'ffff'ffff'f000;
     task.SetDPagingBegin(elf_next_page);
     task.SetDPagingEnd(elf_next_page);
 
     task.SetFileMapEnd(0xffff'ffff'ffff'e000);
 
-    auto entry_addr = elf_header->e_entry;
     int ret =
-        CallApp(argc.value, argv, 3 << 3 | 3, entry_addr,
+        CallApp(argc.value, argv, 3 << 3 | 3, app_load.entry,
                 stack_frame_addr.value + 4096 - 8, &task.OSStackPointer());
 
     task.Files().clear();
@@ -500,8 +524,7 @@ Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
     sprintf(s, "app exited. ret = %d\n", ret);
     Print(s);
 
-    const auto addr_first = GetFirstLoadAddress(elf_header);
-    if (auto err = CleanPageMaps(LinearAddress4Level{addr_first})) {
+    if (auto err = CleanPageMaps(LinearAddress4Level{0xffff'8000'0000'0000})) {
         return err;
     }
 
