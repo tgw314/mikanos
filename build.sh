@@ -24,7 +24,7 @@ run_mikanos() {
     DEVENV_DIR="$MIKANOS_DIR/../osbook/devenv"
     DISK_IMG=${DISK_IMG:-"$MIKANOS_DIR/disk.img"}
     APPS_DIR=${APPS_DIR:-"apps"}
-    RESOURCE_DIR=${RESOURCE_DIR:-}
+    RESOURCE_DIR=${RESOURCE_DIR:-"resource"}
     QEMU_OPTS=${QEMU_OPTS:-}
 
     KERNEL_ELF="$MIKANOS_DIR/kernel/kernel.elf"

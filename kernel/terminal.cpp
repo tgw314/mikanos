@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -18,6 +19,7 @@
 #include "elf.hpp"
 #include "error.hpp"
 #include "fat.hpp"
+#include "file.hpp"
 #include "font.hpp"
 #include "graphics.hpp"
 #include "keyboard.hpp"
@@ -409,21 +411,21 @@ void Terminal::ExecuteLine() {
             return;
         }
 
-        auto cluster = file_entry->FirstCluster();
-        auto remain_bytes = file_entry->file_size;
+        fat::FileDescriptor fd{*file_entry};
+        char u8buf[4];
 
         DrawCursor(false);
-        while (cluster != 0 && cluster != fat::kEndOfClusterChain) {
-            char *p = fat::GetSectorByCluster<char>(cluster);
-            const int bytes_to_read =
-                std::min<unsigned long>(fat::bytes_per_cluster, remain_bytes);
-
-            for (int i = 0; i < bytes_to_read; i++, p++) {
-                Print(*p);
+        for (;;) {
+            if (fd.Read(&u8buf[0], 1) != 1) {
+                break;
             }
-            remain_bytes -= bytes_to_read;
+            const int u8_remain = CountUTF8Size(u8buf[0]) - 1;
+            if (u8_remain > 0 && fd.Read(&u8buf[1], u8_remain) != u8_remain) {
+                break;
+            }
 
-            cluster = fat::NextCluster(cluster);
+            const auto [u32, u8_next] = ConvertUTF8To32(u8buf);
+            Print(u32 ? u32 : U'□');
         }
         DrawCursor(true);
 
@@ -531,7 +533,9 @@ Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
     return FreePML4(task);
 }
 
-void Terminal::Print(char c) {
+void Terminal::Print(char32_t c) {
+    if (!show_window_) return;
+
     auto newline = [this]() {
         cursor_.x = 0;
         if (cursor_.y < kRows - 1) {
@@ -541,32 +545,36 @@ void Terminal::Print(char c) {
         Scroll1();
     };
 
-    if (c == '\n') {
+    if (c == U'\n') {
         newline();
         return;
     }
 
-    if (show_window_) {
+    if (IsHankaku(c)) {
+        if (cursor_.x == kColumns) {
+            newline();
+        }
         WriteAscii(*window_->Writer(), CalcCursorPos(), c, {255, 255, 255});
+        cursor_.x++;
+    } else {
+        if (cursor_.x >= kColumns - 1) {
+            newline();
+        }
+        WriteUnicode(*window_->Writer(), CalcCursorPos(), c, {255, 255, 255});
+        cursor_.x += 2;
     }
-    if (cursor_.x == kColumns - 1) {
-        newline();
-        return;
-    }
-
-    cursor_.x++;
 }
 
 void Terminal::Print(const char *s, std::optional<size_t> len) {
     const auto cursor_before = CalcCursorPos();
     DrawCursor(false);
 
-    if (len) {
-        for (size_t i = 0; i < *len; i++) {
-            Print(*s++);
-        }
-    } else {
-        for (; *s; s++) Print(*s);
+    const size_t len_ = len ? *len : std::numeric_limits<size_t>::max();
+
+    for (size_t i = 0; s[i] && i < len_;) {
+        const auto [u32, bytes] = ConvertUTF8To32(&s[i]);
+        Print(u32);
+        i += bytes;
     }
 
     DrawCursor(true);
