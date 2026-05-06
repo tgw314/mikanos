@@ -33,6 +33,7 @@ class Error {
         kInvalidFile,
         kIsDirectory,
         kNoSuchEntry,
+        kFreeTypeError,
         kLastOfCode,
     };
 
@@ -65,6 +66,7 @@ class Error {
         "kInvalidFile",
         "kIsDirectory",
         "kNoSuchEntry",
+        "kFreeTypeError",
         "kFrameTooSmall",
     };
     static_assert(kLastOfCode == code_names_.size());
