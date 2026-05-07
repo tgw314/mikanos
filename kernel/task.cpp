@@ -80,7 +80,7 @@ std::optional<Message> Task::ReceiveMessage() {
     return m;
 }
 
-std::vector<std::unique_ptr<::FileDescriptor>> &Task::Files() { return files_; }
+std::vector<std::shared_ptr<::FileDescriptor>> &Task::Files() { return files_; }
 
 uint64_t Task::DPagingBegin() const { return dpaging_begin_; }
 void Task::SetDPagingBegin(uint64_t v) { dpaging_begin_ = v; }
