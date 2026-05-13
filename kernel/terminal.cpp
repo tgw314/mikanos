@@ -347,9 +347,12 @@ void Terminal::ExecuteLine() {
     if (first_arg) *(first_arg++) = '\0';
 
     auto original_stdout = files_[1];
+    int exit_code = 0;
 
-    ScopeGuard defer_restore{
+    ScopeGuard restore_stdout{
         [this, original_stdout]() { this->files_[1] = original_stdout; }};
+    ScopeGuard set_exit_code{
+        [this, &exit_code]() { this->last_exit_code_ = exit_code; }};
 
     if (redir_char) {
         *redir_char = '\0';
@@ -374,7 +377,13 @@ void Terminal::ExecuteLine() {
     }
 
     if (strcmp(command, "echo") == 0) {
-        if (first_arg) PrintToFD(*files_[1], "%s", first_arg);
+        if (first_arg && first_arg[0] == '$') {
+            if (strcmp(&first_arg[1], "?") == 0) {
+                PrintToFD(*files_[1], "%d", last_exit_code_);
+            }
+        } else if (first_arg) {
+            PrintToFD(*files_[1], "%s", first_arg);
+        }
         PrintToFD(*files_[1], "\n");
         return;
     }
@@ -411,6 +420,7 @@ void Terminal::ExecuteLine() {
         auto [dir, post_slash] = fat::FindFile(first_arg);
         if (dir == nullptr) {
             PrintToFD(*files_[2], "No such file or directory: %s\n", first_arg);
+            exit_code = 1;
             return;
         }
         if (dir->attr == fat::Attribute::kDirectory) {
@@ -423,6 +433,7 @@ void Terminal::ExecuteLine() {
 
         if (post_slash) {
             PrintToFD(*files_[2], "%s is not a directory", name);
+            exit_code = 1;
             return;
         }
         PrintToFD(*files_[1], "%s\n", name);
@@ -433,6 +444,7 @@ void Terminal::ExecuteLine() {
         auto [file_entry, post_slash] = fat::FindFile(first_arg);
         if (!file_entry) {
             PrintToFD(*files_[2], "no such file: %s\n", first_arg);
+            exit_code = 1;
             return;
         }
 
@@ -440,6 +452,7 @@ void Terminal::ExecuteLine() {
             char name[13];
             fat::FormatName(*file_entry, name);
             PrintToFD(*files_[2], "%s is not a directory\n", name);
+            exit_code = 1;
             return;
         }
 
@@ -486,33 +499,37 @@ void Terminal::ExecuteLine() {
     auto [file_entry, post_slash] = fat::FindFile(command);
     if (!file_entry) {
         PrintToFD(*files_[2], "no such command: %s\n", command);
+        exit_code = 1;
         return;
     }
     if (file_entry->attr != fat::Attribute::kDirectory && post_slash) {
         char name[13];
         fat::FormatName(*file_entry, name);
         PrintToFD(*files_[2], "%s is not a directory\n", name);
+        exit_code = 1;
         return;
     }
 
-    auto err = ExecuteFile(*file_entry, command, first_arg);
+    auto [ec, err] = ExecuteFile(*file_entry, command, first_arg);
     if (err) {
         PrintToFD(*files_[2], "failed to exec file: %s\n", err.Name());
+        exit_code = -ec;
     }
+    exit_code = ec;
 }
 
-Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
-                            char *first_arg) {
+WithError<int> Terminal::ExecuteFile(fat::DirectoryEntry &file_entry,
+                                     char *command, char *first_arg) {
     __asm__("cli");
     auto &task = task_manager->CurrentTask();
     __asm__("sti");
 
     auto [app_load, err] = LoadApp(file_entry, task);
-    if (err) return err;
+    if (err) return {0, err};
 
     LinearAddress4Level args_frame_addr{0xffff'ffff'ffff'f000};
     if (auto err = SetupPageMaps(args_frame_addr, 1)) {
-        return err;
+        return {0, err};
     }
     auto argv = reinterpret_cast<char **>(args_frame_addr.value);
     int argv_len = 32;  // argv = 8 * 32 = 256 bytes
@@ -522,13 +539,13 @@ Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
     auto argc =
         MakeArgVector(command, first_arg, argv, argv_len, argbuf, argbuf_len);
     if (argc.error) {
-        return argc.error;
+        return {0, argc.error};
     }
 
     const int stack_size = 8 * 4096;
     LinearAddress4Level stack_frame_addr{0xffff'ffff'ffff'f000 - stack_size};
     if (auto err = SetupPageMaps(stack_frame_addr, stack_size / 4096)) {
-        return err;
+        return {0, err};
     }
 
     for (int i = 0; i < files_.size(); i++) {
@@ -549,15 +566,11 @@ Error Terminal::ExecuteFile(fat::DirectoryEntry &file_entry, char *command,
     task.Files().clear();
     task.FileMaps().clear();
 
-    char s[64];
-    sprintf(s, "app exited. ret = %d\n", ret);
-    Print(s);
-
     if (auto err = CleanPageMaps(LinearAddress4Level{0xffff'8000'0000'0000})) {
-        return err;
+        return {ret, err};
     }
 
-    return FreePML4(task);
+    return {ret, FreePML4(task)};
 }
 
 void Terminal::Print(char32_t c) {
