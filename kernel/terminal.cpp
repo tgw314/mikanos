@@ -385,9 +385,9 @@ void Terminal::ExecuteLine() {
     int exit_code = 0;
 
     ScopeGuard restore_stdout{
-        [this, original_stdout]() { this->files_[1] = original_stdout; }};
+        [this, original_stdout]() { files_[1] = original_stdout; }};
     ScopeGuard set_exit_code{
-        [this, &exit_code]() { this->last_exit_code_ = exit_code; }};
+        [this, &exit_code]() { last_exit_code_ = exit_code; }};
 
     if (redir_char) {
         *redir_char = '\0';
@@ -434,13 +434,15 @@ void Terminal::ExecuteLine() {
                 .InitContext(TaskTerminal, reinterpret_cast<int64_t>(term_desc))
                 .Wakeup()
                 .ID();
+        (*layer_task_map)[layer_id_] = subtask_id;
     }
 
-    ScopeGuard finish_subtask{[pipe_fd, subtask_id, &exit_code]() {
+    ScopeGuard finish_subtask{[this, pipe_fd, subtask_id, &exit_code]() {
         if (pipe_fd) {
             pipe_fd->FinishWrite();
             __asm__("cli");
             auto [ec, err] = task_manager->WaitFinish(subtask_id);
+            (*layer_task_map)[layer_id_] = task_.ID();
             __asm__("sti");
             if (err) {
                 Log(kWarn, "failed to wait finish: %s\n", err.Name());

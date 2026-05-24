@@ -15,8 +15,8 @@ extern "C" void main(int argc, char **argv) {
     }
 
     std::vector<std::string> lines;
-    char line[1024];
-    while (fgets(line, sizeof(line), fp)) {
+
+    for (char line[1024]; fgets(line, sizeof(line), fp);) {
         lines.push_back(line);
     }
 

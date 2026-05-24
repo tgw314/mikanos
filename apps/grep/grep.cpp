@@ -16,8 +16,7 @@ extern "C" void main(int argc, char **argv) {
         exit(1);
     }
 
-    char line[256];
-    while (fgets(line, sizeof(line), fp)) {
+    for (char line[256]; fgets(line, sizeof(line), fp);) {
         std::cmatch m;
         if (std::regex_search(line, m, pattern)) {
             printf("%s", line);

@@ -13,8 +13,8 @@ extern "C" void main(int argc, char **argv) {
         exit(1);
     }
 
-    char line[256];
     for (int i = 0; i < 3; i++) {
+        char line[256];
         if (fgets(line, sizeof(line), fp) == nullptr) {
             printf("failed to get a line\n");
             exit(1);
