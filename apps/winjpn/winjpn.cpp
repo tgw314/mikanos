@@ -23,11 +23,20 @@ extern "C" void main(int argc, char **argv) {
             printf("ReadEvent failed: %s\n", strerror(err));
             break;
         }
-        if (events[0].type == AppEvent ::kQuit) {
+
+        if (events[0].type == AppEvent::kQuit) {
             break;
         }
+
+        if (events[0].type == AppEvent::kMouseMove ||
+            events[0].type == AppEvent::kMouseButton ||
+            events[0].type == AppEvent::kKeyPush) {
+            continue;
+        }
+
         printf("unknown event: type = %d\n", events[0].type);
     }
+
     SyscallCloseWindow(layer_id);
     exit(0);
 }

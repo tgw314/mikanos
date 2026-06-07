@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "error.hpp"
 #include "frame_buffer.hpp"
 #include "graphics.hpp"
 #include "message.hpp"
@@ -135,3 +136,5 @@ constexpr Message MakeLayerMessage(uint64_t task_id, unsigned int layer_id,
     };
     return msg;
 }
+
+Error CloseLayer(unsigned int layer_id);
